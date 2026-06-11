@@ -56,7 +56,11 @@ const container = {
 const heading = { fontSize: "22px", fontWeight: "bold", color: "#18181b" };
 const text = { fontSize: "15px", lineHeight: "24px", color: "#3f3f46" };
 const muted = { fontSize: "13px", lineHeight: "20px", color: "#71717a" };
-const link = { fontSize: "13px", color: "#2563eb", wordBreak: "break-all" as const };
+const link = {
+  fontSize: "13px",
+  color: "#2563eb",
+  wordBreak: "break-all" as const,
+};
 const button = {
   backgroundColor: "#18181b",
   color: "#ffffff",

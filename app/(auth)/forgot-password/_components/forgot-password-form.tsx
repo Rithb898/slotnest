@@ -118,8 +118,7 @@ export function ForgotPasswordForm({
                     )}
                   </form.Subscribe>
                   <FieldDescription className="text-center">
-                    Remember your password?{" "}
-                    <Link href="/sign-in">Sign in</Link>
+                    Remember your password? <Link href="/sign-in">Sign in</Link>
                   </FieldDescription>
                 </Field>
               </FieldGroup>

@@ -91,10 +91,7 @@ export function ResetPasswordForm({
                 This password reset link is invalid or has expired. Request a
                 new one to continue.
               </FieldDescription>
-              <Link
-                href="/forgot-password"
-                className={buttonVariants()}
-              >
+              <Link href="/forgot-password" className={buttonVariants()}>
                 Request a new link
               </Link>
             </FieldGroup>
