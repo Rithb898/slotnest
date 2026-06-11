@@ -21,6 +21,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import z from "zod";
 import { useForm } from "@tanstack/react-form";
+import { useState } from "react";
 import { authClient } from "@/server/auth/client";
 
 const formSchema = z
@@ -43,6 +44,7 @@ export function SignupForm({
   ...props
 }: React.ComponentProps<"div">) {
   const router = useRouter();
+  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   const form = useForm({
     defaultValues: {
@@ -55,6 +57,7 @@ export function SignupForm({
       onSubmit: formSchema,
     },
     onSubmit: async ({ value }) => {
+      setPasswordError(null);
       await authClient.signUp.email(
         {
           name: value.name,
@@ -68,6 +71,10 @@ export function SignupForm({
             router.push("/");
           },
           onError: (ctx) => {
+            if (ctx.error.code === "PASSWORD_COMPROMISED") {
+              setPasswordError(ctx.error.message);
+              return;
+            }
             toast.error(ctx.error.message);
           },
         },
@@ -144,10 +151,16 @@ export function SignupForm({
                           placeholder="••••••••"
                           value={field.state.value}
                           onBlur={field.handleBlur}
-                          onChange={(e) => field.handleChange(e.target.value)}
+                          onChange={(e) => {
+                            setPasswordError(null);
+                            field.handleChange(e.target.value);
+                          }}
                         />
                         {field.state.meta.errors.length > 0 && (
                           <FieldError errors={field.state.meta.errors} />
+                        )}
+                        {passwordError && (
+                          <FieldError errors={[{ message: passwordError }]} />
                         )}
                       </Field>
                     )}
