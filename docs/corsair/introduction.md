@@ -1,0 +1,44 @@
+---
+title: Introduction
+description: The go-to integration layer for AI agents and apps — connect anything, anywhere, in seconds.
+mode: "wide"
+---
+
+import { IntroFeatures } from '/snippets/intro-features.mdx';
+
+Corsair is the go-to way to add any integration to your app or agent. Auth, token refresh, data storage, webhooks, rate limits — all handled. You write the part that's unique to your use case, not the plumbing you've already written a hundred times.
+
+```ts corsair.ts
+import { createCorsair, slack, github, gmail, linear } from 'corsair';
+
+export const corsair = createCorsair({
+    plugins: [slack(), github(), gmail(), linear()],
+    database: db,
+    kek: process.env.CORSAIR_KEK!,
+});
+```
+
+Connect it to your agent and start prompting:
+
+```
+Invite Jim to next Thursday's sales call. Tell him over Slack too so he
+can accept it. Let me know when he does.
+```
+
+One prompt, four integrations — Corsair handles the rest.
+
+<IntroFeatures />
+
+## Get started
+
+<CardGroup cols={3}>
+  <Card title="Quick start" icon="rocket" href="/getting-started/quick-start">
+    Install, migrate, and run your first integration in minutes.
+  </Card>
+  <Card title="MCP adapters" icon="robot" href="/mcp-adapters/mcp-adapters">
+    Connect your agent framework and start prompting across every plugin.
+  </Card>
+  <Card title="Browse plugins" icon="grid" href="/guides/plugins">
+    Slack, Linear, Gmail, GitHub, HubSpot, Stripe, and hundreds more.
+  </Card>
+</CardGroup>
