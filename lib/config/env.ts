@@ -12,6 +12,7 @@ export const env = createEnv({
     GOOGLE_CLIENT_SECRET: z.string(),
     RESEND_API_KEY: z.string(),
     EMAIL_FROM: z.string(),
+    APP_URL: z.url(),
   },
   client: {},
   runtimeEnv: {
@@ -24,6 +25,7 @@ export const env = createEnv({
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
     RESEND_API_KEY: process.env.RESEND_API_KEY,
     EMAIL_FROM: process.env.EMAIL_FROM,
+    APP_URL: process.env.APP_URL,
   },
   /**
    * Makes it so that empty strings are treated as undefined. `SOME_VAR: z.string()` and

@@ -748,14 +748,22 @@ Get a specific message
 await corsair.gmail.api.messages.get({});
 ```
 
+> **CAVEAT (verified against the live API, 2026-06-12):** `format: "metadata"`
+> returns `payload` with only `mimeType` — **`payload.headers` is omitted**, and
+> `metadataHeaders` does not bring them back. The synced local DB
+> (`gmail.db.messages`) stores the same stripped shape. To read From / To /
+> Subject / Date headers, you must use **`format: "full"`**. Trade-off: `full`
+> also returns the message body, so listing N messages just for headers is N
+> full fetches.
+
 **Input**
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
 | `userId` | `string` | No | — |
 | `id` | `string` | Yes | — |
-| `format` | `minimal \| full \| raw \| metadata` | No | — |
-| `metadataHeaders` | `string[]` | No | — |
+| `format` | `minimal \| full \| raw \| metadata` | No | Use `full` to read headers — `metadata` omits `payload.headers` (see caveat above). |
+| `metadataHeaders` | `string[]` | No | Has no effect in practice — headers are omitted under `metadata` format. |
 
 
 
