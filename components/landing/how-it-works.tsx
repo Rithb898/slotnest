@@ -29,7 +29,7 @@ export function HowItWorks() {
   return (
     <section
       id="how"
-      className="mx-auto max-w-6xl scroll-mt-20 px-5 py-20 sm:px-8 lg:py-28"
+      className="mx-auto max-w-7xl scroll-mt-20 px-5 py-20 sm:px-8 lg:py-28"
     >
       <Reveal className="max-w-2xl">
         <SectionHeading>

@@ -1,122 +1,109 @@
+"use client";
+
 import {
   ArrowRight,
-  CalendarClock,
-  Command,
+  BarChart2,
+  Calendar,
+  ChevronRight,
+  HelpCircle,
   Inbox,
-  Keyboard,
-  Reply,
+  Settings,
   Sparkles,
+  TrendingUp,
 } from "lucide-react";
 import Link from "next/link";
-import { CommandBarDemo } from "@/components/landing/command-bar-demo";
-import { Chip } from "@/components/landing/shared";
-import { TriageDonut } from "@/components/landing/triage-donut";
+import { useState } from "react";
+import { cn } from "@/lib/utils";
 
 export function Hero() {
   return (
-    <section className="relative overflow-hidden">
-      {/* Soft honey light pooled at the top */}
-      <div aria-hidden className="pointer-events-none absolute inset-0">
+    <section className="relative overflow-hidden bg-white px-4 pt-10 pb-20 sm:px-8 sm:pt-16 lg:pb-28">
+      {/* Background soft grids */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 select-none opacity-40"
+      >
         <div
-          className="absolute inset-x-0 top-0 h-[460px]"
+          className="absolute inset-0"
           style={{
-            background:
-              "radial-gradient(58% 62% at 50% -4%, oklch(0.97 0.035 80 / 0.85), transparent 72%)",
+            backgroundImage: `radial-gradient(circle at 1px 1px, #e3e3e3 1px, transparent 0)`,
+            backgroundSize: "24px 24px",
           }}
         />
       </div>
 
-      <div className="relative mx-auto max-w-6xl px-5 pb-16 pt-14 sm:px-8 sm:pt-20 lg:pb-24">
-        {/* Rounded panel backdrop behind the headline block */}
-        <div className="relative">
+      <div className="relative mx-auto max-w-7xl">
+        {/* Flanking 3D prop - Left */}
+        <div className="absolute -left-6 top-[26%] -z-10 size-44 pointer-events-none hidden lg:block float-soft">
           <div
-            aria-hidden
-            className="absolute inset-x-[-1rem] -top-10 bottom-[-2rem] -z-10 rounded-[2.5rem] border border-border/60 bg-secondary/40 sm:inset-x-0"
+            className="orb size-full"
+            style={{
+              background:
+                "radial-gradient(circle at 30% 28%, oklch(0.86 0.08 90), oklch(0.70 0.13 75), oklch(0.48 0.12 58))",
+              boxShadow:
+                "inset -8px -10px 24px rgba(0,0,0,0.32), inset 8px 10px 18px rgba(255,255,255,0.65), 0 28px 50px rgba(217,154,60,0.22)",
+            }}
           />
+        </div>
 
-          {/* Glossy 3D orbs, flanking — the image-1 hero objects */}
+        {/* Flanking 3D prop - Right */}
+        <div
+          className="absolute -right-4 top-[34%] -z-10 size-40 pointer-events-none hidden lg:block float-soft"
+          style={{ animationDelay: "1.5s" }}
+        >
           <div
-            aria-hidden
-            className="float-soft absolute -left-2 top-6 hidden size-20 sm:block lg:-left-6 lg:size-24"
-          >
-            <span className="orb size-full" />
-          </div>
-          <div
-            aria-hidden
-            className="float-soft absolute -right-1 top-16 hidden size-16 sm:block lg:-right-4 lg:size-20"
-            style={{ animationDelay: "1.5s" }}
-          >
-            <span className="orb size-full" />
-          </div>
+            className="orb size-full"
+            style={{
+              background:
+                "radial-gradient(circle at 30% 28%, oklch(0.88 0.08 95), oklch(0.74 0.13 75), oklch(0.50 0.11 68))",
+              boxShadow:
+                "inset -8px -10px 24px rgba(0,0,0,0.32), inset 8px 10px 18px rgba(255,255,255,0.65), 0 28px 50px rgba(217,154,60,0.22)",
+            }}
+          />
+        </div>
 
-          <div className="mx-auto max-w-3xl px-2 pt-6 text-center sm:pt-8">
-            <p
-              className="hero-rise inline-flex items-center gap-2 rounded-full border border-border bg-card/80 px-3 py-1 text-[0.78rem] font-medium text-muted-foreground backdrop-blur"
-              style={{ animationDelay: "0ms" }}
-            >
-              <span className="grid size-4 place-items-center rounded-full bg-primary/20 text-honey-ink">
-                <Sparkles className="size-2.5" />
-              </span>
-              For Gmail &amp; Google Calendar
-            </p>
+        {/* Hero typography block */}
+        <div className="mx-auto max-w-3xl text-center">
+          <h1 className="text-balance leading-none tracking-tight">
+            <span className="block font-serif text-[2.5rem] font-light italic text-[#2c2c2c] sm:text-[3.75rem] lg:text-[4.5rem] leading-[1.15]">
+              Revolutionize Your Inbox
+            </span>
+            <span className="mt-2 block font-sans text-[2.75rem] font-bold text-[#2c2c2c] sm:text-[4rem] lg:text-[4.75rem] leading-[1.05] tracking-tighter">
+              with Next-Gen Speed
+            </span>
+          </h1>
 
-            <h1
-              className="hero-rise mt-6 text-balance leading-[1.02] tracking-[-0.03em]"
-              style={{ animationDelay: "80ms" }}
-            >
-              <span className="block font-serif text-[2.5rem] font-normal italic text-honey-ink sm:text-[3.4rem] lg:text-[4rem]">
-                A quieter inbox,
-              </span>
-              <span className="mt-1 block text-[2.5rem] font-semibold sm:text-[3.4rem] lg:text-[4rem]">
-                for Gmail &amp; Calendar.
-              </span>
-            </h1>
+          <p className="mx-auto mt-6 max-w-xl text-pretty text-sm sm:text-base leading-relaxed text-muted-foreground">
+            Our cutting-edge command center provides deep AI triage and fast
+            scheduling to boost your daily email productivity.
+          </p>
 
-            <p
-              className="hero-rise mx-auto mt-5 max-w-xl text-pretty text-[1.05rem] leading-relaxed text-muted-foreground"
-              style={{ animationDelay: "160ms" }}
+          <div className="mt-8 flex items-center justify-center gap-3">
+            <Link
+              href="/sign-up"
+              className="inline-flex h-11 items-center gap-2 rounded-full bg-[#1c1c1c] px-7 text-xs font-bold text-white transition-all hover:bg-[#2d2d2d] active:translate-y-px"
             >
-              SlotNest is a keyboard-first command center that triages, replies,
-              and schedules in seconds — without leaving the keyboard.
-            </p>
-
-            <div
-              className="hero-rise mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row"
-              style={{ animationDelay: "240ms" }}
+              Get Started Now
+              <ArrowRight className="size-3.5" />
+            </Link>
+            <Link
+              href="#demo"
+              className="inline-flex h-11 items-center gap-2 rounded-full border border-border bg-white px-6 text-xs font-bold text-[#2c2c2c] transition-all hover:bg-secondary active:translate-y-px"
             >
-              <Link
-                href="/sign-up"
-                className="sheen-host inline-flex h-11 items-center gap-2 rounded-full bg-primary px-6 text-[0.95rem] font-semibold text-primary-foreground transition-[background-color,transform] duration-150 hover:bg-[oklch(0.74_0.13_75)] active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-              >
-                Get started free
-                <ArrowRight className="size-4" />
-              </Link>
-              <a
-                href="#how"
-                className="inline-flex h-11 items-center gap-2 rounded-full border border-border bg-card px-5 text-[0.95rem] font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-              >
-                See how it works
-              </a>
-            </div>
-
-            <p
-              className="hero-rise mt-4 inline-flex items-center gap-1.5 text-[0.8rem] text-muted-foreground"
-              style={{ animationDelay: "300ms" }}
-            >
-              <Keyboard className="size-3.5" />
-              Press
-              <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[0.72rem]">
-                ⌘K
-              </kbd>
-              to do anything
-            </p>
+              Watch Demo
+            </Link>
           </div>
         </div>
 
-        {/* Product dashboard — the image-1 centerpiece */}
+        {/* Mockup dashboard browser window — fades up out of the section */}
         <div
-          className="hero-rise mx-auto mt-14 max-w-4xl"
-          style={{ animationDelay: "380ms" }}
+          className="mx-auto mt-16 max-w-5xl"
+          style={{
+            maskImage:
+              "linear-gradient(to bottom, transparent 0%, black 12%, black 100%)",
+            WebkitMaskImage:
+              "linear-gradient(to bottom, transparent 0%, black 12%, black 100%)",
+          }}
         >
           <HeroDashboard />
         </div>
@@ -126,140 +113,467 @@ export function Hero() {
 }
 
 function HeroDashboard() {
-  return (
-    <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-[0_40px_90px_-44px_rgba(0,0,0,0.45)]">
-      {/* window chrome */}
-      <div className="flex items-center gap-2 border-b border-border bg-secondary/50 px-4 py-3">
-        <span className="size-3 rounded-full bg-border" />
-        <span className="size-3 rounded-full bg-border" />
-        <span className="size-3 rounded-full bg-border" />
-        <div className="ml-3 flex items-center gap-2 rounded-md bg-card px-2.5 py-1 text-[0.72rem] text-muted-foreground">
-          <Command className="size-3" /> Command center
-        </div>
-        <div className="ml-auto hidden items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 font-mono text-[0.7rem] text-muted-foreground sm:flex">
-          <Command className="size-3" /> K
-        </div>
-      </div>
+  const [activeTab, setActiveTab] = useState("Standard");
 
-      <div className="grid sm:grid-cols-[56px_1fr]">
-        {/* icon rail */}
-        <nav className="hidden flex-col items-center gap-2 border-r border-border bg-secondary/30 py-4 sm:flex">
-          {[
-            { i: Inbox, k: "inbox", on: true },
-            { i: Reply, k: "reply", on: false },
-            { i: CalendarClock, k: "schedule", on: false },
-            { i: Sparkles, k: "drafts", on: false },
-          ].map((r) => (
-            <span
-              key={r.k}
-              className={`grid size-9 place-items-center rounded-xl ${
-                r.on ? "bg-primary/15 text-honey-ink" : "text-muted-foreground"
-              }`}
-            >
-              <r.i className="size-4" />
-            </span>
-          ))}
-        </nav>
-
-        {/* main — inner panels settle in just after the frame arrives */}
-        <div className="space-y-3 p-3 sm:p-4">
-          <div className="hero-rise" style={{ animationDelay: "480ms" }}>
-            <CommandBarDemo embedded />
-          </div>
-
-          <div
-            className="hero-rise grid gap-3 lg:grid-cols-[200px_1fr]"
-            style={{ animationDelay: "580ms" }}
-          >
-            <TriageDonut />
-            <NeedsReplyMini />
-          </div>
-
-          <div className="hero-rise" style={{ animationDelay: "680ms" }}>
-            <TodayStrip />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function NeedsReplyMini() {
-  const rows = [
-    { s: "Priya Nair", t: "Re: Q3 planning deck", urgent: true },
-    { s: "Marco Bianchi", t: "Coffee before the offsite?", urgent: false },
-    { s: "Dana Cole", t: "Contract — quick question", urgent: false },
+  // Radar chart metrics
+  const radarMetrics = [
+    { name: "Triage Accuracy", value: 78, status: "GOOD", pct: "78%" },
+    { name: "Response Speed", value: 57, status: "ATTN", pct: "57%" },
+    { name: "Inbox Health", value: 46, status: "ATTN", pct: "46%" },
+    { name: "Focus Time", value: 72, status: "GOOD", pct: "72%" },
+    { name: "Action Rate", value: 42, status: "ATTN", pct: "42%" },
+    { name: "Calendar Balance", value: 77, status: "GOOD", pct: "77%" },
+    { name: "Quiet Time", value: 81, status: "GOOD", pct: "81%" },
   ];
+
+  // SVG Radar setup
+  const cx = 100;
+  const cy = 90;
+  const r = 60;
+  const numSides = 7;
+
+  const getPoints = (scale: number) => {
+    const points = [];
+    for (let i = 0; i < numSides; i++) {
+      const angle = (i * 2 * Math.PI) / numSides - Math.PI / 2;
+      const x = cx + r * scale * Math.cos(angle);
+      const y = cy + r * scale * Math.sin(angle);
+      points.push(`${x},${y}`);
+    }
+    return points.join(" ");
+  };
+
+  const dataPoints = radarMetrics
+    .map((m, i) => {
+      const angle = (i * 2 * Math.PI) / numSides - Math.PI / 2;
+      const radius = r * (m.value / 100);
+      const x = cx + radius * Math.cos(angle);
+      const y = cy + radius * Math.sin(angle);
+      return `${x},${y}`;
+    })
+    .join(" ");
+
+  const axisLines = Array.from({ length: numSides }).map((_, i) => {
+    const angle = (i * 2 * Math.PI) / numSides - Math.PI / 2;
+    const x = cx + r * Math.cos(angle);
+    const y = cy + r * Math.sin(angle);
+    return { x2: x, y2: y };
+  });
+
+  const vertexPoints = Array.from({ length: numSides }).map((_, i) => {
+    const angle = (i * 2 * Math.PI) / numSides - Math.PI / 2;
+    const labelR = r + 10;
+    const x = cx + labelR * Math.cos(angle);
+    const y = cy + labelR * Math.sin(angle) + 3;
+    return { x, y, label: (i + 1).toString() };
+  });
+
   return (
-    <div className="rounded-2xl border border-border/70 p-4">
-      <div className="flex items-center justify-between">
-        <span className="text-[0.8rem] font-medium text-muted-foreground">
-          Needs reply
-        </span>
-        <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[0.7rem] font-medium text-honey-ink">
-          3
-        </span>
+    <div className="overflow-hidden rounded-2xl border border-border bg-[#f8f6f2] shadow-[0_25px_60px_-25px_rgba(0,0,0,0.15)] flex flex-col w-full text-[#2c2c2c]">
+      {/* Browser bar */}
+      <div className="flex items-center gap-2 border-b border-border bg-white/80 backdrop-blur px-5 py-3.5 select-none">
+        <div className="flex gap-1.5">
+          <span className="size-2.5 rounded-full bg-[#c54f3d]" />
+          <span className="size-2.5 rounded-full bg-[#d99a3c]" />
+          <span className="size-2.5 rounded-full bg-[#4c9b6b]" />
+        </div>
+        <div className="flex gap-1 ml-4 mr-2 text-muted-foreground/60">
+          <ChevronRight className="size-4 rotate-180" />
+          <ChevronRight className="size-4" />
+        </div>
+        <div className="flex-1 max-w-md mx-auto rounded-lg bg-[#f0ede6]/70 px-4 py-1 text-center text-[0.72rem] text-muted-foreground font-medium flex items-center justify-center gap-1.5 border border-border/40">
+          <span className="size-1.5 rounded-full bg-[#4c9b6b]" />
+          slotnest.ai
+        </div>
+        <div className="flex items-center gap-3 ml-auto text-muted-foreground/80">
+          <HelpCircle className="size-3.5" />
+          <div className="rounded border border-border bg-white px-2 py-0.5 text-[0.62rem] font-mono font-semibold">
+            ⌘K
+          </div>
+        </div>
       </div>
-      <ul className="mt-2.5 space-y-1.5">
-        {rows.map((r) => (
-          <li key={r.s} className="flex items-center gap-3">
-            <span className="grid size-7 shrink-0 place-items-center rounded-full bg-secondary text-[0.66rem] font-semibold text-muted-foreground">
-              {r.s
-                .split(" ")
-                .map((w) => w[0])
-                .join("")
-                .slice(0, 2)}
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className="truncate text-[0.82rem] font-medium">
-                  {r.s}
-                </span>
-                {r.urgent && <Chip variant="urgent">Urgent</Chip>}
-              </div>
-              <p className="truncate text-[0.76rem] text-muted-foreground">
-                {r.t}
+
+      {/* Browser client grid */}
+      <div className="grid md:grid-cols-[250px_1fr_240px] gap-4 p-4">
+        {/* Column 1: Overview & Metrics */}
+        <div className="flex flex-col gap-4">
+          <div className="rounded-xl border border-border p-4 bg-white shadow-sm flex flex-col">
+            <div className="flex items-center justify-between text-xs font-semibold">
+              <span>Overview</span>
+              <Settings className="size-3.5 text-muted-foreground" />
+            </div>
+
+            {/* SVG Radar spider chart */}
+            <div className="h-44 w-full flex items-center justify-center mt-2 select-none">
+              <svg viewBox="0 0 200 200" className="size-full">
+                <title>Overview metrics radar chart</title>
+                {/* Concentric grid heptagons */}
+                {[0.2, 0.4, 0.6, 0.8, 1.0].map((scale) => (
+                  <polygon
+                    key={scale}
+                    points={getPoints(scale)}
+                    className="stroke-border/70 fill-none"
+                    strokeWidth="0.75"
+                  />
+                ))}
+
+                {/* Grid axis lines */}
+                {axisLines.map((line) => (
+                  <line
+                    key={`axis-line-${line.x2}-${line.y2}`}
+                    x1={cx}
+                    y1={cy}
+                    x2={line.x2}
+                    y2={line.y2}
+                    className="stroke-border/50"
+                    strokeWidth="0.75"
+                  />
+                ))}
+
+                {/* Vertex index tags */}
+                {vertexPoints.map((pt) => (
+                  <text
+                    key={`vertex-${pt.label}`}
+                    x={pt.x}
+                    y={pt.y}
+                    className="text-[9px] fill-muted-foreground font-bold text-center"
+                    textAnchor="middle"
+                  >
+                    {pt.label}
+                  </text>
+                ))}
+
+                {/* Active data polygon */}
+                <polygon
+                  points={dataPoints}
+                  className="stroke-[#4c9b6b] fill-[#4c9b6b]/15"
+                  strokeWidth="1.5"
+                />
+
+                {/* Center dot */}
+                <circle cx={cx} cy={cy} r="2" className="fill-[#4c9b6b]" />
+              </svg>
+            </div>
+
+            {/* Metrics list */}
+            <div className="mt-3 space-y-1.5">
+              {radarMetrics.slice(0, 5).map((m, idx) => (
+                <div
+                  key={m.name}
+                  className="flex items-center justify-between text-[0.7rem] font-medium border-b border-border/40 pb-1.5"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono text-muted-foreground text-[0.65rem] font-bold">
+                      {idx + 1}
+                    </span>
+                    <span className="text-muted-foreground">{m.name}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-bold">{m.pct}</span>
+                    <span
+                      className={cn(
+                        "text-[0.58rem] font-bold px-1 py-0.2 rounded",
+                        m.status === "GOOD"
+                          ? "bg-[#4c9b6b]/15 text-[#4c9b6b]"
+                          : "bg-[#d99a3c]/15 text-[#d99a3c]",
+                      )}
+                    >
+                      {m.status}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Upgrade plan card */}
+          <div
+            className="rounded-xl p-4 text-white relative overflow-hidden flex flex-col justify-between h-[120px] shadow-sm"
+            style={{
+              background:
+                "linear-gradient(135deg, oklch(0.70 0.13 75) 0%, oklch(0.65 0.12 70) 100%)",
+            }}
+          >
+            <div className="absolute right-[-10px] bottom-[-10px] size-24 rounded-full border-[10px] border-white/10" />
+            <div>
+              <h3 className="text-xs font-bold text-[#2c2c2c] leading-tight">
+                Upgrade your plan
+              </h3>
+              <p className="text-[0.65rem] text-[#2c2c2c]/80 mt-1 max-w-[140px]">
+                Get unlimited AI drafts and fast calendar integrations
               </p>
             </div>
-            <kbd className="hidden shrink-0 rounded border border-border bg-card px-1.5 py-0.5 font-mono text-[0.66rem] text-muted-foreground sm:inline">
-              R
-            </kbd>
-          </li>
-        ))}
-      </ul>
+            <button
+              type="button"
+              className="bg-[#1c1c1c] text-white hover:bg-black font-semibold text-[0.68rem] py-1.5 px-3 rounded-lg w-max transition-colors"
+            >
+              Go Premium
+            </button>
+          </div>
+        </div>
+
+        {/* Column 2: Dashboard Content Panel */}
+        <div className="flex flex-col gap-4">
+          <div className="rounded-xl border border-border bg-white shadow-sm flex-1 flex flex-col min-h-[380px]">
+            {/* Inner navigation bar */}
+            <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
+              <div className="flex gap-2">
+                {["Standard", "Heatmap", "Insights", "Skeleton"].map((tab) => (
+                  <button
+                    type="button"
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={cn(
+                      "text-[0.7rem] font-bold px-3 py-1 rounded-full transition-colors",
+                      activeTab === tab
+                        ? "bg-[#1c1c1c] text-white"
+                        : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+                    )}
+                  >
+                    {tab} view
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-1.5 text-muted-foreground select-none">
+                <span className="size-1.5 rounded-full bg-border" />
+                <span className="size-1.5 rounded-full bg-border" />
+              </div>
+            </div>
+
+            {/* Showcase details */}
+            <div className="flex-1 p-5 flex flex-col gap-4">
+              <div className="rounded-xl border border-border/80 bg-[#f8f6f2] p-4 flex flex-col gap-3 flex-1 justify-center relative overflow-hidden">
+                <div className="absolute top-[-40px] right-[-40px] size-40 rounded-full border-4 border-white/5 opacity-40" />
+                <div>
+                  <span className="text-[0.65rem] font-bold text-muted-foreground uppercase tracking-wider">
+                    AI ASSISTANT DRAFT
+                  </span>
+                  <h2 className="text-base font-bold text-[#2c2c2c] mt-0.5">
+                    Automate, Reply, Outperform
+                  </h2>
+                </div>
+
+                <div className="rounded-lg border border-border bg-white p-3 shadow-sm flex flex-col gap-2 relative">
+                  <div className="flex items-center gap-1 text-[0.68rem] text-muted-foreground border-b border-border/40 pb-1.5">
+                    <span className="font-semibold text-foreground">
+                      Reply request:
+                    </span>
+                    <span>Decline invite but offer Wednesday 2 PM</span>
+                  </div>
+                  <div className="text-[0.75rem] font-medium text-foreground leading-relaxed">
+                    Hi Priya, <br />
+                    Thanks for reaching out! Tuesday doesn&apos;t work for me,
+                    but I&apos;m free on{" "}
+                    <span className="bg-primary/20 text-honey-ink px-1 rounded font-bold">
+                      Wednesday at 2:00 PM
+                    </span>
+                    . Let me know if that works!
+                    <span className="caret inline-block w-1.5 h-3.5 bg-primary ml-0.5 align-middle" />
+                  </div>
+                  <div className="mt-1 flex items-center justify-between">
+                    <span className="text-[0.62rem] text-muted-foreground">
+                      Tone: Calm, clear
+                    </span>
+                    <button
+                      type="button"
+                      className="bg-primary hover:bg-[#e6a64d] text-[#2c2c2c] font-bold text-[0.65rem] py-1 px-2.5 rounded-md flex items-center gap-1 border border-primary-strong/30 transition-colors"
+                    >
+                      Insert Draft
+                      <span className="font-mono text-[0.58rem] border border-black/10 bg-white/40 px-1 rounded">
+                        Tab
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* AI Reports Circular Gauges */}
+              <div>
+                <h4 className="text-[0.7rem] font-bold text-muted-foreground uppercase tracking-wider mb-3">
+                  AI triage health
+                </h4>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="border border-border/60 rounded-xl p-3 flex flex-col items-center bg-white shadow-xs">
+                    <ProgressCircle
+                      value={85}
+                      label="Mail Triage"
+                      icon={Inbox}
+                    />
+                  </div>
+                  <div className="border border-border/60 rounded-xl p-3 flex flex-col items-center bg-white shadow-xs">
+                    <ProgressCircle
+                      value={64}
+                      label="Draft Flows"
+                      icon={Sparkles}
+                    />
+                  </div>
+                  <div className="border border-border/60 rounded-xl p-3 flex flex-col items-center bg-white shadow-xs">
+                    <ProgressCircle
+                      value={92}
+                      label="Free Slots"
+                      icon={Calendar}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Column 3: Flow Cards & Passing Rate */}
+        <div className="flex flex-col gap-4">
+          {/* Transfer Flow */}
+          <div className="rounded-xl border border-border p-4 bg-white shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between text-[0.7rem] font-semibold text-muted-foreground">
+              <span>Response Flow</span>
+              <TrendingUp className="size-3.5 text-[#4c9b6b]" />
+            </div>
+            <div className="mt-3 flex items-baseline justify-between">
+              <span className="text-xl font-bold text-[#2c2c2c]">87%</span>
+              <span className="text-[0.62rem] font-bold px-1.5 py-0.2 bg-[#4c9b6b]/15 text-[#4c9b6b] rounded">
+                GOOD
+              </span>
+            </div>
+            <div className="mt-2.5 h-1.5 w-full rounded-full bg-secondary overflow-hidden">
+              <div className="h-full bg-[#4c9b6b]" style={{ width: "87%" }} />
+            </div>
+          </div>
+
+          {/* Request Flow */}
+          <div className="rounded-xl border border-border p-4 bg-white shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between text-[0.7rem] font-semibold text-muted-foreground">
+              <span>Schedule Flow</span>
+              <TrendingUp className="size-3.5 text-[#d99a3c]" />
+            </div>
+            <div className="mt-3 flex items-baseline justify-between">
+              <span className="text-xl font-bold text-[#2c2c2c]">52%</span>
+              <span className="text-[0.62rem] font-bold px-1.5 py-0.2 bg-[#d99a3c]/15 text-[#d99a3c] rounded">
+                ATTN
+              </span>
+            </div>
+            <div className="mt-2.5 h-1.5 w-full rounded-full bg-secondary overflow-hidden">
+              <div className="h-full bg-[#d99a3c]" style={{ width: "52%" }} />
+            </div>
+          </div>
+
+          {/* Sync Code Card */}
+          <div className="rounded-xl border border-border p-4 bg-white shadow-sm flex flex-col gap-2">
+            <span className="text-[0.7rem] font-semibold text-muted-foreground">
+              Calendar Sync
+            </span>
+            <p className="text-[0.68rem] text-muted-foreground leading-normal">
+              OAuth token sync active. Incoming Google Calendar events map live
+              to SlotNest triaging.
+            </p>
+            <div className="h-px bg-border/50 my-1" />
+            <span className="text-[0.62rem] font-semibold text-muted-foreground/80 flex items-center gap-1">
+              <span className="size-1.5 rounded-full bg-[#4c9b6b] inline-block animate-pulse" />
+              Connected to Corsair Multi-Tenant
+            </span>
+          </div>
+
+          {/* Passing Rate */}
+          <PassingRate />
+        </div>
+      </div>
     </div>
   );
 }
 
-function TodayStrip() {
-  const events = [
-    { t: "10:00", title: "Team standup", dur: "15m" },
-    { t: "14:00", title: "Q3 review with Priya", dur: "30m" },
-    { t: "16:30", title: "1:1 with Marco", dur: "30m" },
-  ];
+function ProgressCircle({
+  value,
+  label,
+  icon: Icon,
+}: {
+  value: number;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}) {
+  const radius = 22;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (value / 100) * circumference;
+
   return (
-    <div className="rounded-2xl border border-border/70 p-4">
-      <div className="flex items-center gap-2 text-[0.8rem] font-medium text-muted-foreground">
-        <CalendarClock className="size-3.5 text-honey-ink" />
-        Today
+    <div className="flex flex-col items-center gap-2 select-none">
+      <div className="relative size-12 flex items-center justify-center">
+        <svg className="absolute inset-0 size-full -rotate-90">
+          <title>Triage health indicator: {label}</title>
+          <circle
+            cx="24"
+            cy="24"
+            r={radius}
+            className="stroke-secondary fill-none"
+            strokeWidth="3.5"
+          />
+          <circle
+            cx="24"
+            cy="24"
+            r={radius}
+            className="stroke-primary fill-none"
+            strokeWidth="3.5"
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            strokeLinecap="round"
+          />
+        </svg>
+        <Icon className="size-4.5 text-honey-ink" />
       </div>
-      <div className="mt-2.5 grid gap-2 sm:grid-cols-3">
-        {events.map((e) => (
-          <div
-            key={e.title}
-            className="flex items-center gap-2.5 rounded-xl bg-secondary/50 px-3 py-2"
-          >
-            <span className="font-mono text-[0.8rem] font-medium text-honey-ink">
-              {e.t}
-            </span>
-            <div className="min-w-0">
-              <div className="truncate text-[0.8rem] font-medium">
-                {e.title}
-              </div>
-              <div className="text-[0.7rem] text-muted-foreground">{e.dur}</div>
-            </div>
+      <span className="text-[0.65rem] font-semibold text-muted-foreground">
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function PassingRate() {
+  return (
+    <div className="rounded-xl border border-border p-4 bg-white shadow-sm flex flex-col">
+      <div className="flex items-center justify-between text-[0.7rem] font-semibold text-muted-foreground">
+        <span>Triage Rate</span>
+        <BarChart2 className="size-3.5" />
+      </div>
+
+      <div className="mt-3 flex items-baseline gap-1.5">
+        <span className="text-xl font-bold text-[#2c2c2c]">61%</span>
+        <span className="text-[0.62rem] text-[#4c9b6b] font-bold">Passing</span>
+      </div>
+
+      {/* Segmented Progress Bar */}
+      <div className="mt-2.5 h-3.5 w-full rounded-full overflow-hidden flex bg-secondary">
+        <div className="h-full bg-[#4c9b6b]" style={{ width: "61%" }} />
+        <div className="h-full bg-[#c54f3d]" style={{ width: "17%" }} />
+        <div
+          className="h-full bg-[#e3e3e3]"
+          style={{
+            width: "22%",
+            backgroundImage:
+              "repeating-linear-gradient(45deg, #e3e3e3, #e3e3e3 4px, #cccccc 4px, #cccccc 8px)",
+          }}
+        />
+      </div>
+
+      <div className="mt-3.5 space-y-1 text-[0.62rem] font-bold text-muted-foreground">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <span className="size-1.5 rounded-full bg-[#4c9b6b]" />
+            <span>Success</span>
           </div>
-        ))}
+          <span className="text-foreground">61%</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <span className="size-1.5 rounded-full bg-[#c54f3d]" />
+            <span>Failed</span>
+          </div>
+          <span className="text-foreground">17%</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <span className="size-1.5 rounded-full bg-[#cccccc]" />
+            <span>Partial</span>
+          </div>
+          <span className="text-foreground">22%</span>
+        </div>
       </div>
     </div>
   );

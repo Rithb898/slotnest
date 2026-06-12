@@ -1,0 +1,605 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - navigation "Primary" [ref=e4]:
+        - link "SlotNest Logo SlotNest" [ref=e5] [cursor=pointer]:
+          - /url: /
+          - img "SlotNest Logo" [ref=e6]
+          - generic [ref=e9]: SlotNest
+        - generic [ref=e10]:
+          - link "Features" [ref=e11] [cursor=pointer]:
+            - /url: "#features"
+          - link "How it works" [ref=e12] [cursor=pointer]:
+            - /url: "#how"
+          - link "FAQ" [ref=e13] [cursor=pointer]:
+            - /url: "#faq"
+        - generic [ref=e14]:
+          - link "Sign in" [ref=e15] [cursor=pointer]:
+            - /url: /sign-in
+          - link "Sign Up" [ref=e16] [cursor=pointer]:
+            - /url: /sign-up
+    - generic [ref=e18]:
+      - generic [ref=e19]:
+        - heading "Revolutionize Your Inbox with Next-Gen Speed" [level=1] [ref=e20]:
+          - generic [ref=e21]: Revolutionize Your Inbox
+          - generic [ref=e22]: with Next-Gen Speed
+        - paragraph [ref=e23]: Our cutting-edge command center provides deep AI triage and fast scheduling to boost your daily email productivity.
+        - generic [ref=e24]:
+          - link "Get Started Now" [ref=e25] [cursor=pointer]:
+            - /url: /sign-up
+            - text: Get Started Now
+            - img [ref=e26]
+          - link "Watch Demo" [ref=e28] [cursor=pointer]:
+            - /url: "#demo"
+      - generic [ref=e30]:
+        - generic [ref=e31]:
+          - generic [ref=e36]:
+            - img [ref=e37]
+            - img [ref=e39]
+          - generic [ref=e41]: slotnest.ai
+          - generic [ref=e43]:
+            - img [ref=e44]
+            - generic [ref=e47]: ⌘K
+        - generic [ref=e48]:
+          - generic [ref=e49]:
+            - generic [ref=e50]:
+              - generic [ref=e51]:
+                - generic [ref=e52]: Overview
+                - img [ref=e53]
+              - img "Overview metrics radar chart" [ref=e57]:
+                - generic [ref=e69]: "1"
+                - generic [ref=e70]: "2"
+                - generic [ref=e71]: "3"
+                - generic [ref=e72]: "4"
+                - generic [ref=e73]: "5"
+                - generic [ref=e74]: "6"
+                - generic [ref=e75]: "7"
+              - generic [ref=e78]:
+                - generic [ref=e79]:
+                  - generic [ref=e80]:
+                    - generic [ref=e81]: "1"
+                    - generic [ref=e82]: Triage Accuracy
+                  - generic [ref=e83]:
+                    - generic [ref=e84]: 78%
+                    - generic [ref=e85]: GOOD
+                - generic [ref=e86]:
+                  - generic [ref=e87]:
+                    - generic [ref=e88]: "2"
+                    - generic [ref=e89]: Response Speed
+                  - generic [ref=e90]:
+                    - generic [ref=e91]: 57%
+                    - generic [ref=e92]: ATTN
+                - generic [ref=e93]:
+                  - generic [ref=e94]:
+                    - generic [ref=e95]: "3"
+                    - generic [ref=e96]: Inbox Health
+                  - generic [ref=e97]:
+                    - generic [ref=e98]: 46%
+                    - generic [ref=e99]: ATTN
+                - generic [ref=e100]:
+                  - generic [ref=e101]:
+                    - generic [ref=e102]: "4"
+                    - generic [ref=e103]: Focus Time
+                  - generic [ref=e104]:
+                    - generic [ref=e105]: 72%
+                    - generic [ref=e106]: GOOD
+                - generic [ref=e107]:
+                  - generic [ref=e108]:
+                    - generic [ref=e109]: "5"
+                    - generic [ref=e110]: Action Rate
+                  - generic [ref=e111]:
+                    - generic [ref=e112]: 42%
+                    - generic [ref=e113]: ATTN
+            - generic [ref=e114]:
+              - generic [ref=e116]:
+                - heading "Upgrade your plan" [level=3] [ref=e117]
+                - paragraph [ref=e118]: Get unlimited AI drafts and fast calendar integrations
+              - button "Go Premium" [ref=e119] [cursor=pointer]
+          - generic [ref=e121]:
+            - generic [ref=e123]:
+              - button "Standard view" [ref=e124] [cursor=pointer]
+              - button "Heatmap view" [ref=e125] [cursor=pointer]
+              - button "Insights view" [ref=e126] [cursor=pointer]
+              - button "Skeleton view" [ref=e127] [cursor=pointer]
+            - generic [ref=e131]:
+              - generic [ref=e132]:
+                - generic [ref=e134]:
+                  - text: AI ASSISTANT DRAFT
+                  - heading "Automate, Reply, Outperform" [level=2] [ref=e135]
+                - generic [ref=e136]:
+                  - generic [ref=e137]:
+                    - generic [ref=e138]: "Reply request:"
+                    - generic [ref=e139]: Decline invite but offer Wednesday 2 PM
+                  - generic [ref=e140]:
+                    - text: Hi Priya,
+                    - text: Thanks for reaching out! Tuesday doesn't work for me, but I'm free on Wednesday at 2:00 PM. Let me know if that works!
+                  - generic [ref=e142]:
+                    - generic [ref=e143]: "Tone: Calm, clear"
+                    - button "Insert Draft Tab" [ref=e144] [cursor=pointer]:
+                      - text: Insert Draft
+                      - generic [ref=e145]: Tab
+              - generic [ref=e146]:
+                - heading "AI triage health" [level=4] [ref=e147]
+                - generic [ref=e148]:
+                  - generic [ref=e150]:
+                    - generic [ref=e151]:
+                      - img [ref=e152]
+                      - img [ref=e155]
+                    - generic [ref=e158]: Mail Triage
+                  - generic [ref=e160]:
+                    - generic [ref=e161]:
+                      - img [ref=e162]
+                      - img [ref=e165]
+                    - generic [ref=e168]: Draft Flows
+                  - generic [ref=e170]:
+                    - generic [ref=e171]:
+                      - img [ref=e172]
+                      - img [ref=e175]
+                    - generic [ref=e177]: Free Slots
+          - generic [ref=e178]:
+            - generic [ref=e179]:
+              - generic [ref=e180]:
+                - generic [ref=e181]: Response Flow
+                - img [ref=e182]
+              - generic [ref=e185]:
+                - generic [ref=e186]: 87%
+                - generic [ref=e187]: GOOD
+            - generic [ref=e190]:
+              - generic [ref=e191]:
+                - generic [ref=e192]: Schedule Flow
+                - img [ref=e193]
+              - generic [ref=e196]:
+                - generic [ref=e197]: 52%
+                - generic [ref=e198]: ATTN
+            - generic [ref=e201]:
+              - generic [ref=e202]: Calendar Sync
+              - paragraph [ref=e203]: OAuth token sync active. Incoming Google Calendar events map live to SlotNest triaging.
+              - generic [ref=e205]: Connected to Corsair Multi-Tenant
+            - generic [ref=e207]:
+              - generic [ref=e208]:
+                - generic [ref=e209]: Triage Rate
+                - img [ref=e210]
+              - generic [ref=e211]:
+                - generic [ref=e212]: 61%
+                - generic [ref=e213]: Passing
+              - generic [ref=e218]:
+                - generic [ref=e219]:
+                  - generic [ref=e222]: Success
+                  - generic [ref=e223]: 61%
+                - generic [ref=e224]:
+                  - generic [ref=e227]: Failed
+                  - generic [ref=e228]: 17%
+                - generic [ref=e229]:
+                  - generic [ref=e232]: Partial
+                  - generic [ref=e233]: 22%
+    - generic [ref=e236]:
+      - generic: 4X
+      - generic [ref=e239]:
+        - generic [ref=e240]:
+          - generic [ref=e242]:
+            - generic [ref=e243]: Reply rate
+            - generic [ref=e244]: 61%
+          - generic [ref=e248]:
+            - generic [ref=e249]: Time saved
+            - generic [ref=e250]: 88%
+        - heading "Boost reply rates" [level=2] [ref=e254]:
+          - text: Boost
+          - text: reply
+          - text: rates
+    - main [ref=e255]:
+      - region "What SlotNest does" [ref=e256]:
+        - list [ref=e258]:
+          - listitem [ref=e259]:
+            - img [ref=e260]
+            - text: Connects securely with Google OAuth
+          - listitem [ref=e262]:
+            - img [ref=e263]
+            - text: AI triage by action & urgency
+          - listitem [ref=e265]:
+            - img [ref=e266]
+            - text: Replies drafted in your voice
+          - listitem [ref=e268]:
+            - img [ref=e269]
+            - text: Real free-slot scheduling
+          - listitem [ref=e271]:
+            - img [ref=e272]
+            - text: Instant local search
+          - listitem [ref=e274]:
+            - img [ref=e275]
+            - text: Keyboard-first, mouse-optional
+          - listitem [ref=e277]:
+            - img [ref=e278]
+            - text: Connects securely with Google OAuth
+          - listitem [ref=e280]:
+            - img [ref=e281]
+            - text: AI triage by action & urgency
+          - listitem [ref=e283]:
+            - img [ref=e284]
+            - text: Replies drafted in your voice
+          - listitem [ref=e286]:
+            - img [ref=e287]
+            - text: Real free-slot scheduling
+          - listitem [ref=e289]:
+            - img [ref=e290]
+            - text: Instant local search
+          - listitem [ref=e292]:
+            - img [ref=e293]
+            - text: Keyboard-first, mouse-optional
+      - generic [ref=e295]:
+        - generic [ref=e296]:
+          - heading "Everything in one quiet place." [level=2] [ref=e297]:
+            - text: Everything in
+            - emphasis [ref=e298]: one quiet place.
+          - paragraph [ref=e299]: SlotNest reads your inbox the way you would — sorting what needs a reply from what's just noise — so the first thing you see is the thing to do.
+        - generic [ref=e301]:
+          - generic [ref=e302]:
+            - generic [ref=e306]:
+              - img [ref=e307]
+              - text: Inbox · Priority
+            - generic [ref=e310]:
+              - img [ref=e311]
+              - text: K
+          - generic [ref=e313]:
+            - navigation [ref=e314]:
+              - generic [ref=e315]:
+                - img [ref=e317]
+                - generic [ref=e320]: Inbox
+                - generic [ref=e321]: "8"
+              - generic [ref=e322]:
+                - img [ref=e323]
+                - generic [ref=e326]: Needs reply
+                - generic [ref=e327]: "3"
+              - generic [ref=e328]:
+                - img [ref=e329]
+                - generic [ref=e333]: Schedule
+              - generic [ref=e334]:
+                - img [ref=e335]
+                - generic [ref=e338]: Drafts
+                - generic [ref=e339]: "2"
+            - generic [ref=e340]:
+              - generic [ref=e341]:
+                - generic [ref=e343]: PN
+                - generic [ref=e344]:
+                  - generic [ref=e345]:
+                    - generic [ref=e346]: Priya Nair
+                    - generic [ref=e347]: Urgent
+                    - generic [ref=e348]: Needs reply
+                  - paragraph [ref=e349]: "Re: Q3 planning deck — a couple of edits — These look great. Can we move the review to Thursday so…"
+                - time [ref=e350]: 9:24
+              - generic [ref=e351]:
+                - generic [ref=e352]: MB
+                - generic [ref=e353]:
+                  - generic [ref=e354]:
+                    - generic [ref=e355]: Marco Bianchi
+                    - generic [ref=e356]: Needs reply
+                  - paragraph [ref=e357]: Coffee before the offsite? — Free any morning this week? Would love to sync before…
+                - time [ref=e358]: 8:51
+              - generic [ref=e359]:
+                - generic [ref=e360]: F
+                - generic [ref=e361]:
+                  - generic [ref=e362]:
+                    - generic [ref=e363]: Figma
+                    - generic [ref=e364]: FYI
+                  - paragraph [ref=e365]: "Weekly digest: 4 files updated — Here's what changed in your team's projects this week…"
+                - time [ref=e366]: 7:30
+              - generic [ref=e367]:
+                - generic [ref=e368]: "N"
+                - generic [ref=e369]:
+                  - generic [ref=e370]:
+                    - generic [ref=e371]: Notion
+                    - generic [ref=e372]: Invite
+                  - paragraph [ref=e373]: Your invite to the design review — Added — accept or propose a new time straight from here…
+                - time [ref=e374]: Yest
+      - generic [ref=e375]:
+        - generic [ref=e377]:
+          - heading "Unlock the full potential of your inbox" [level=2] [ref=e378]:
+            - generic [ref=e379]: Unlock the full potential
+            - generic [ref=e380]: of your inbox
+          - paragraph [ref=e381]: See every signal that matters — triage accuracy, reply speed, and calendar health — in one calm, glanceable command center.
+        - generic [ref=e383]:
+          - generic [ref=e384]:
+            - generic [ref=e385]:
+              - generic [ref=e386]: Triage overview
+              - img [ref=e387]
+            - generic [ref=e390]:
+              - generic [ref=e391]: 87%
+              - generic [ref=e392]: Healthy
+            - paragraph [ref=e393]: Inbox triaged automatically
+            - generic [ref=e395]:
+              - generic [ref=e396]: Backlog rate
+              - generic [ref=e397]: 52%
+          - generic [ref=e400]:
+            - generic [ref=e401]:
+              - generic [ref=e402]: Sender analysis
+              - img [ref=e403]
+            - generic [ref=e414]:
+              - generic [ref=e415]: PN
+              - generic [ref=e416]: MB
+              - generic [ref=e417]: FG
+              - generic [ref=e418]: ST
+              - generic [ref=e419]: "+9"
+              - generic [ref=e420]: Top conversations this week
+          - generic [ref=e421]:
+            - generic [ref=e422]:
+              - generic [ref=e423]: Advanced analytics
+              - img [ref=e424]
+            - img "Analytics radar" [ref=e428]
+          - generic [ref=e433]:
+            - generic [ref=e434]:
+              - img "Inbox health gauge" [ref=e435]
+              - generic [ref=e438]:
+                - generic [ref=e439]: "826"
+                - generic [ref=e440]: / 1000
+            - paragraph [ref=e441]: Inbox health score
+          - generic [ref=e444]:
+            - text: Flow insights
+            - heading "Replies sent 2.4× faster" [level=3] [ref=e445]
+            - paragraph [ref=e446]: Draft-ready answers cut the time from open to send.
+            - img [ref=e447]
+          - generic [ref=e450]:
+            - generic [ref=e451]:
+              - generic [ref=e452]: Insights history
+              - img [ref=e453]
+            - generic [ref=e456]:
+              - generic [ref=e457]:
+                - generic [ref=e458]: Mon
+                - generic [ref=e459]: Triage accuracy
+                - generic [ref=e460]: 94%
+                - generic [ref=e461]: GOOD
+              - generic [ref=e462]:
+                - generic [ref=e463]: Tue
+                - generic [ref=e464]: Reply latency
+                - generic [ref=e465]: 1.2h
+                - generic [ref=e466]: GOOD
+              - generic [ref=e467]:
+                - generic [ref=e468]: Wed
+                - generic [ref=e469]: Backlog cleared
+                - generic [ref=e470]: 61%
+                - generic [ref=e471]: ATTN
+              - generic [ref=e472]:
+                - generic [ref=e473]: Thu
+                - generic [ref=e474]: Meetings booked
+                - generic [ref=e475]: "12"
+                - generic [ref=e476]: GOOD
+          - generic [ref=e477]:
+            - generic [ref=e478]:
+              - generic [ref=e479]: AI reports
+              - img [ref=e480]
+            - generic [ref=e483]:
+              - generic [ref=e484]:
+                - img [ref=e486]
+                - generic [ref=e489]: Triage
+              - generic [ref=e490]:
+                - img [ref=e492]
+                - generic [ref=e495]: Draft
+              - generic [ref=e496]:
+                - img [ref=e498]
+                - generic [ref=e500]: Schedule
+      - generic [ref=e502]:
+        - generic [ref=e503]:
+          - generic [ref=e504]:
+            - generic [ref=e505]:
+              - img [ref=e506]
+              - text: Triage
+            - heading "Know what matters at a glance." [level=3] [ref=e509]:
+              - text: Know what matters
+              - emphasis [ref=e510]: at a glance.
+            - paragraph [ref=e511]: Every email is sorted on two axes — what you need to do, and how soon. Needs-reply rises to the top, FYI steps aside, and nothing urgent slips past.
+            - list [ref=e512]:
+              - listitem [ref=e513]:
+                - img [ref=e515]
+                - generic [ref=e517]: "Action labels: Needs reply · FYI · Ignore"
+              - listitem [ref=e518]:
+                - img [ref=e520]
+                - generic [ref=e522]: "Urgency: Urgent · Normal · Low"
+              - listitem [ref=e523]:
+                - img [ref=e525]
+                - generic [ref=e527]: A single sortable priority, not a wall of bold
+          - generic [ref=e531]:
+            - generic [ref=e532]:
+              - generic [ref=e533]: PN
+              - generic [ref=e534]: Priya Nair
+              - generic [ref=e535]: Urgent
+              - generic [ref=e536]: Needs reply
+            - generic [ref=e537]:
+              - generic [ref=e538]: MB
+              - generic [ref=e539]: Marco Bianchi
+              - generic [ref=e540]: Needs reply
+            - generic [ref=e541]:
+              - generic [ref=e542]: F
+              - generic [ref=e543]: Figma
+              - generic [ref=e544]: FYI
+            - generic [ref=e545]:
+              - generic [ref=e546]: S
+              - generic [ref=e547]: Stripe
+              - generic [ref=e548]: Invite
+        - generic [ref=e549]:
+          - generic [ref=e550]:
+            - generic [ref=e551]:
+              - img [ref=e552]
+              - text: Draft replies
+            - heading "Replies, already written." [level=3] [ref=e555]:
+              - text: Replies, already
+              - emphasis [ref=e556]: written.
+            - paragraph [ref=e557]: For anything that needs a response, SlotNest prepares a draft in your tone. Read it, tweak a word, send — or rewrite from scratch. You're always the one who hits send.
+            - list [ref=e558]:
+              - listitem [ref=e559]:
+                - img [ref=e561]
+                - generic [ref=e563]: Matched to how you actually write
+              - listitem [ref=e564]:
+                - img [ref=e566]
+                - generic [ref=e568]: Edit inline before anything sends
+              - listitem [ref=e569]:
+                - img [ref=e571]
+                - generic [ref=e573]: Nothing leaves your account unprompted
+          - generic [ref=e576]:
+            - generic [ref=e577]:
+              - img [ref=e578]
+              - text: Draft to
+              - generic [ref=e581]: Priya Nair
+              - generic [ref=e582]: in your voice
+            - paragraph [ref=e583]: Hi Priya — Thursday works well on my end. I've shifted the review to 2:00pm and updated the deck with your edits. Anything else you'd like me to fold in before then?
+            - generic [ref=e584]:
+              - generic [ref=e585]:
+                - text: Send
+                - generic [ref=e586]: ⌘↵
+              - generic [ref=e587]: Rewrite
+        - generic [ref=e588]:
+          - generic [ref=e589]:
+            - generic [ref=e590]:
+              - img [ref=e591]
+              - text: Scheduling
+            - heading "Find time without the back-and-forth." [level=3] [ref=e595]:
+              - text: Find time without the
+              - emphasis [ref=e596]: back-and-forth.
+            - paragraph [ref=e597]: Say “find 30 minutes with Marco this week” and SlotNest reads your real calendar, proposes open slots, and sends the invite — straight from an email if you want.
+            - list [ref=e598]:
+              - listitem [ref=e599]:
+                - img [ref=e601]
+                - generic [ref=e603]: Real free slots, not guesses
+              - listitem [ref=e604]:
+                - img [ref=e606]
+                - generic [ref=e608]: Turn an email into an invite in one step
+              - listitem [ref=e609]:
+                - img [ref=e611]
+                - generic [ref=e613]: Time and title pulled from the thread
+          - generic [ref=e616]:
+            - generic [ref=e617]:
+              - img [ref=e618]
+              - text: Free slots with
+              - generic [ref=e622]: Marco
+              - generic [ref=e623]: 30 min
+            - generic [ref=e624]:
+              - generic [ref=e625]:
+                - generic [ref=e626]: Wed
+                - generic [ref=e627]: 2:00 pm
+              - generic [ref=e628]:
+                - generic [ref=e629]: Thu
+                - generic [ref=e630]: 11:30 am
+                - generic [ref=e631]:
+                  - img [ref=e632]
+                  - text: picked
+              - generic [ref=e634]:
+                - generic [ref=e635]: Fri
+                - generic [ref=e636]: 9:00 am
+            - generic [ref=e637]:
+              - img [ref=e638]
+              - text: Invite sent for Thu 11:30 am
+      - paragraph [ref=e642]:
+        - text: Email that gets
+        - emphasis [ref=e643]: out of your way
+        - text: — so the rest of your day doesn't have to wait on it.
+      - generic [ref=e644]:
+        - heading "From cluttered to clear in four steps." [level=2] [ref=e646]:
+          - text: From cluttered to clear in
+          - emphasis [ref=e647]: four steps.
+        - list [ref=e648]:
+          - listitem [ref=e649]:
+            - generic [ref=e650]:
+              - generic [ref=e651]:
+                - img [ref=e653]
+                - generic [ref=e656]: "01"
+              - heading "Connect your accounts" [level=3] [ref=e657]
+              - paragraph [ref=e658]: Link Gmail and Google Calendar once with secure Google OAuth. Revoke any time.
+          - listitem [ref=e659]:
+            - generic [ref=e660]:
+              - generic [ref=e661]:
+                - img [ref=e663]
+                - generic [ref=e666]: "02"
+              - heading "SlotNest triages your inbox" [level=3] [ref=e667]
+              - paragraph [ref=e668]: Mail is sorted by action and urgency, and replies are drafted in your voice.
+          - listitem [ref=e669]:
+            - generic [ref=e670]:
+              - generic [ref=e671]:
+                - img [ref=e673]
+                - generic [ref=e675]: "03"
+              - heading "Act from the command bar" [level=3] [ref=e676]
+              - paragraph [ref=e677]: Hit ⌘K and type plainly — reply, archive, search, schedule. It just runs.
+          - listitem [ref=e678]:
+            - generic [ref=e679]:
+              - generic [ref=e680]:
+                - img [ref=e682]
+                - generic [ref=e684]: "04"
+              - heading "Schedule into real free time" [level=3] [ref=e685]
+              - paragraph [ref=e686]: Find open slots and send invites without ever opening the calendar grid.
+      - generic [ref=e687]:
+        - heading "Frequently asked questions." [level=2] [ref=e689]:
+          - text: Frequently asked
+          - emphasis [ref=e690]: questions.
+        - list [ref=e692]:
+          - listitem [ref=e693]:
+            - heading "What exactly is SlotNest?" [level=3] [ref=e694]:
+              - button "What exactly is SlotNest?" [expanded] [ref=e695] [cursor=pointer]:
+                - generic [ref=e696]: What exactly is SlotNest?
+                - img [ref=e697]
+            - region "What exactly is SlotNest?" [ref=e700]:
+              - paragraph [ref=e702]: A keyboard-first command center for Gmail and Google Calendar. It triages your inbox, drafts replies in your voice, and finds real free slots on your calendar — all from one ⌘K command bar that understands plain language.
+          - listitem [ref=e703]:
+            - heading "Do I need to learn keyboard shortcuts?" [level=3] [ref=e704]:
+              - button "Do I need to learn keyboard shortcuts?" [ref=e705] [cursor=pointer]:
+                - generic [ref=e706]: Do I need to learn keyboard shortcuts?
+                - img [ref=e707]
+            - paragraph [ref=e708]: No. Every action has an obvious button, and the command bar takes plain English ("reply to Priya", "find time with Marco"). Shortcuts are there when you want to go faster — never required.
+          - listitem [ref=e709]:
+            - heading "Is my email and calendar data secure?" [level=3] [ref=e710]:
+              - button "Is my email and calendar data secure?" [ref=e711] [cursor=pointer]:
+                - generic [ref=e712]: Is my email and calendar data secure?
+                - img [ref=e713]
+            - paragraph [ref=e714]: SlotNest connects through Google's official OAuth — you grant access, and you can revoke it any time. We never see your password, and your data is scoped to your account alone.
+          - listitem [ref=e715]:
+            - heading "Which accounts does it work with?" [level=3] [ref=e716]:
+              - button "Which accounts does it work with?" [ref=e717] [cursor=pointer]:
+                - generic [ref=e718]: Which accounts does it work with?
+                - img [ref=e719]
+            - paragraph [ref=e720]: Gmail and Google Calendar today. You connect each once, and SlotNest keeps a fast local copy so search and triage feel instant.
+          - listitem [ref=e721]:
+            - heading "Will it send email on my behalf?" [level=3] [ref=e722]:
+              - button "Will it send email on my behalf?" [ref=e723] [cursor=pointer]:
+                - generic [ref=e724]: Will it send email on my behalf?
+                - img [ref=e725]
+            - paragraph [ref=e726]: Only when you say so. Replies and invites are drafted for you to review — nothing leaves your account until you press send.
+      - generic [ref=e730]:
+        - heading "Ready to enhance your inbox and reclaim your time?" [level=2] [ref=e731]:
+          - text: Ready to enhance your inbox
+          - emphasis [ref=e732]: and reclaim your time?
+        - paragraph [ref=e733]: Connect Gmail and Google Calendar, and clear your morning before your coffee gets cold.
+        - generic [ref=e734]:
+          - link "Get Started Now" [ref=e735] [cursor=pointer]:
+            - /url: /sign-up
+            - text: Get Started Now
+            - img [ref=e736]
+          - link "Sign in" [ref=e738] [cursor=pointer]:
+            - /url: /sign-in
+    - contentinfo [ref=e739]:
+      - generic [ref=e740]:
+        - link "SlotNest Logo SlotNest" [ref=e741] [cursor=pointer]:
+          - /url: /
+          - img "SlotNest Logo" [ref=e742]
+          - generic [ref=e745]: SlotNest
+        - navigation [ref=e746]:
+          - link "Features" [ref=e747] [cursor=pointer]:
+            - /url: "#features"
+          - link "How it works" [ref=e748] [cursor=pointer]:
+            - /url: "#how"
+          - link "FAQ" [ref=e749] [cursor=pointer]:
+            - /url: "#faq"
+          - link "Sign in" [ref=e750] [cursor=pointer]:
+            - /url: /sign-in
+        - generic [ref=e751]:
+          - link "Twitter" [ref=e752] [cursor=pointer]:
+            - /url: "#"
+            - img [ref=e753]
+          - link "Website" [ref=e756] [cursor=pointer]:
+            - /url: "#"
+            - img [ref=e757]
+          - link "Email" [ref=e760] [cursor=pointer]:
+            - /url: "#"
+            - img [ref=e761]
+      - generic [ref=e765]:
+        - generic: SlotNest
+      - generic [ref=e766]:
+        - generic [ref=e767]: © 2026 SlotNest
+        - generic [ref=e768]: Built for a quieter inbox.
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e774] [cursor=pointer]:
+    - img [ref=e775]

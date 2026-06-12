@@ -4,7 +4,7 @@ import { Reveal } from "@/components/landing/reveal";
 
 export function Showcase() {
   return (
-    <section className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-28">
+    <section className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28">
       <Reveal className="mx-auto max-w-2xl text-center">
         <SectionHeading>
           Everything in{" "}

@@ -7,7 +7,7 @@ export function Features() {
   return (
     <section
       id="features"
-      className="mx-auto max-w-6xl scroll-mt-20 px-5 py-12 sm:px-8"
+      className="mx-auto max-w-7xl scroll-mt-20 px-5 py-12 sm:px-8"
     >
       <div className="flex flex-col gap-20 lg:gap-28">
         <FeatureFold
