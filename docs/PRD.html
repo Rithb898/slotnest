@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SlotNest — Product Requirements Document</title>
+<style>
+  :root {
+    --bg: #0b0d12; --panel: #12151c; --panel2: #171b24; --border: #232838;
+    --text: #e6e9f0; --muted: #9aa3b2; --accent: #6ea8fe; --accent2: #7ee0c0;
+    --p0: #ff6b6b; --p1: #ffd166; --p2: #8fb3ff; --ok: #5ad19a;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 48px 24px 120px; }
+  header.hero { border:1px solid var(--border); border-radius:16px; padding:32px;
+    background:linear-gradient(135deg,#141926,#0e1118); margin-bottom:32px; }
+  header.hero h1 { margin:0 0 6px; font-size:34px; letter-spacing:-0.5px; }
+  header.hero .tag { color:var(--accent); font-weight:600; }
+  .meta { display:flex; flex-wrap:wrap; gap:8px 18px; color:var(--muted); font-size:14px; margin-top:14px; }
+  .meta b { color:var(--text); font-weight:600; }
+  h2 { font-size:24px; margin:44px 0 12px; padding-bottom:8px; border-bottom:1px solid var(--border); }
+  h3 { font-size:18px; margin:26px 0 8px; color:var(--accent2); }
+  p { color:var(--text); }
+  .muted { color:var(--muted); }
+  section.card { background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:22px 24px; margin:16px 0; }
+  ul, ol { padding-left:22px; }
+  li { margin:5px 0; }
+  code { font-family:var(--mono); background:var(--panel2); padding:2px 6px; border-radius:5px; font-size:13.5px; color:#cdd6f4; }
+  .pill { display:inline-block; font-size:12px; font-weight:700; padding:2px 9px; border-radius:999px; vertical-align:middle; }
+  .P0 { background:rgba(255,107,107,.16); color:var(--p0); border:1px solid rgba(255,107,107,.4); }
+  .P1 { background:rgba(255,209,102,.15); color:var(--p1); border:1px solid rgba(255,209,102,.4); }
+  .P2 { background:rgba(143,179,255,.15); color:var(--p2); border:1px solid rgba(143,179,255,.4); }
+  table { width:100%; border-collapse:collapse; margin:12px 0; font-size:14.5px; }
+  th, td { text-align:left; padding:10px 12px; border-bottom:1px solid var(--border); vertical-align:top; }
+  th { color:var(--muted); font-weight:600; font-size:13px; text-transform:uppercase; letter-spacing:.4px; }
+  tbody tr:hover { background:var(--panel2); }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; }
+  .feat { background:var(--panel2); border:1px solid var(--border); border-radius:12px; padding:16px; }
+  .feat h4 { margin:0 0 6px; font-size:15.5px; }
+  .feat .why { color:var(--muted); font-size:13.5px; }
+  .phase { border-left:3px solid var(--accent); padding:4px 0 4px 18px; margin:18px 0; }
+  .phase h3 { margin-top:0; color:var(--text); }
+  .scorebar { display:flex; height:14px; border-radius:8px; overflow:hidden; border:1px solid var(--border); margin:6px 0 18px; }
+  .scorebar span { display:block; }
+  .kbd { font-family:var(--mono); background:#222838; border:1px solid #333c52; border-bottom-width:2px; border-radius:6px; padding:1px 7px; font-size:13px; }
+  .callout { border-left:3px solid var(--accent2); background:rgba(126,224,192,.06); padding:12px 16px; border-radius:0 10px 10px 0; margin:14px 0; }
+  .warn { border-left:3px solid var(--p1); background:rgba(255,209,102,.06); padding:12px 16px; border-radius:0 10px 10px 0; margin:14px 0; }
+  .toc a { color:var(--accent); text-decoration:none; }
+  .toc a:hover { text-decoration:underline; }
+  footer { margin-top:60px; color:var(--muted); font-size:13px; border-top:1px solid var(--border); padding-top:20px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <div class="tag">CORSAIR HACKATHON · PRD</div>
+  <h1>SlotNest</h1>
+  <p class="muted" style="margin:6px 0 0; font-size:18px;">A keyboard-first command center for Gmail &amp; Google Calendar — powered by Corsair.</p>
+  <div class="meta">
+    <span><b>Owner:</b> rithb8981@gmail.com</span>
+    <span><b>Status:</b> Draft v1</span>
+    <span><b>Created:</b> 2026-06-12</span>
+    <span><b>Hackathon ends:</b> 2026-06-18</span>
+    <span><b>Stack:</b> Next.js · Postgres · Corsair · OpenAI</span>
+  </div>
+</header>
+
+<section class="card toc">
+  <b>Contents</b>
+  <ol>
+    <li><a href="#problem">Problem &amp; Vision</a></li>
+    <li><a href="#goals">Goals &amp; Non-Goals</a></li>
+    <li><a href="#users">Users &amp; Scenarios</a></li>
+    <li><a href="#features">Features &amp; Priorities</a></li>
+    <li><a href="#arch">Architecture &amp; Key Decisions</a></li>
+    <li><a href="#triage">Triage Model</a></li>
+    <li><a href="#roadmap">Step-by-Step Build Plan</a></li>
+    <li><a href="#scoring">Scoring Coverage</a></li>
+    <li><a href="#deliver">Deliverables &amp; Definition of Done</a></li>
+    <li><a href="#risks">Risks &amp; Mitigations</a></li>
+  </ol>
+</section>
+
+<h2 id="problem">1. Problem &amp; Vision</h2>
+<section class="card">
+  <p>Everyday email + calendar work costs too many clicks across two apps. Turning a "let's meet Thursday" email into a sent invite is 6+ clicks. The inbox buries what actually needs a reply. Search is slow and keyword-only. Nothing is keyboard-driven.</p>
+  <p><b>Vision:</b> SlotNest is a single, keyboard-first surface where you triage, reply, search, and schedule at the speed of thought — with an AI agent that executes real Gmail/Calendar actions from one sentence. It does not reimagine Gmail's look; it removes the friction Gmail and Calendar leave behind.</p>
+  <div class="callout"><b>North star:</b> Solve real workflow pain — not a clone, not AI-for-AI's-sake. Every feature must measurably remove clicks or surface what matters.</div>
+</section>
+
+<h2 id="goals">2. Goals &amp; Non-Goals</h2>
+<section class="card">
+  <h3>Goals</h3>
+  <ul>
+    <li>Real Gmail + Google Calendar integration <b>through Corsair</b> (mandatory; non-hardcoded).</li>
+    <li>At least one obviously-better-than-Gmail workflow, demoable in &lt;30s.</li>
+    <li>Keyboard-first UX with a unified command bar.</li>
+    <li>AI that earns its place: triage, drafting, scheduling, agent execution.</li>
+    <li>Deployed live link + YC-style demo video + open-source repo.</li>
+  </ul>
+  <h3>Non-Goals (v1)</h3>
+  <ul>
+    <li>Multiple Gmail/Calendar accounts per user (one of each in v1).</li>
+    <li>Mobile-native app; full Gmail label/filter management parity.</li>
+    <li>Team/shared inboxes, billing, or org admin.</li>
+    <li>Providers beyond Gmail + Google Calendar.</li>
+  </ul>
+</section>
+
+<h2 id="users">3. Users &amp; Scenarios</h2>
+<section class="card">
+  <p><b>Primary user:</b> a busy professional who lives in Gmail + Calendar and wants to move faster with the keyboard.</p>
+  <h3>Signature scenarios</h3>
+  <ul>
+    <li><b>One-sentence scheduling:</b> <span class="kbd">⌘K</span> → "Send a calendar invite to friend@corsair.dev at 9 AM next Thursday and email him I look forward to it." → done.</li>
+    <li><b>Triage in seconds:</b> open inbox sorted by priority; "3 need a reply" — clear them with keyboard, each with a pre-written draft waiting.</li>
+    <li><b>Email → invite:</b> on a meeting email, one keystroke creates &amp; sends an invite to the sender at an extracted time.</li>
+    <li><b>Instant search:</b> sub-second semantic + keyword search over locally cached mail.</li>
+  </ul>
+</section>
+
+<h2 id="features">4. Features &amp; Priorities</h2>
+<section class="card">
+  <p class="muted"><span class="pill P0">P0</span> demo is dead without it · <span class="pill P1">P1</span> v1 signature, build after P0 · <span class="pill P2">P2</span> stretch / if time remains</p>
+  <table>
+    <thead><tr><th>Feature</th><th>Priority</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><b>Corsair OAuth connect</b></td><td><span class="pill P0">P0</span></td><td>Per-user Gmail + Calendar connect via Corsair multi-tenant OAuth (plan 001). Unblocks everything.</td></tr>
+      <tr><td><b>Webhook ingest → Postgres</b></td><td><span class="pill P0">P0</span></td><td>Corsair webhooks push new mail/events; persisted as the local cache.</td></tr>
+      <tr><td><b>Inbox + email read</b></td><td><span class="pill P0">P0</span></td><td>Threaded inbox over cached data; open/read.</td></tr>
+      <tr><td><b>Unified command bar (⌘K)</b></td><td><span class="pill P0">P0</span></td><td>One surface: fuzzy commands + natural language → agent. The app's primary entry point.</td></tr>
+      <tr><td><b>Email send / reply / draft</b></td><td><span class="pill P0">P0</span></td><td>Full compose, reply, save-draft via Gmail API through Corsair.</td></tr>
+      <tr><td><b>Calendar create + send invite</b></td><td><span class="pill P0">P0</span></td><td>Create event with attendees, send invite via Calendar API.</td></tr>
+      <tr><td><b>Agent chat (OpenAI + Corsair MCP)</b></td><td><span class="pill P0">P0</span></td><td>NL → email + calendar actions in one command. Highest-value bonus.</td></tr>
+      <tr><td><b>Email → invite one-shot</b></td><td><span class="pill P1">P1</span></td><td>From an email, LLM extracts time/title and sends invite to sender in one keystroke.</td></tr>
+      <tr><td><b>Two-axis triage</b></td><td><span class="pill P1">P1</span></td><td>Action (Needs reply / FYI / Ignore) + Urgency (Urgent / Normal / Low), scored by cheap LLM on ingest.</td></tr>
+      <tr><td><b>Hybrid search</b></td><td><span class="pill P1">P1</span></td><td>pgvector semantic + Postgres full-text over local cache, sub-second.</td></tr>
+      <tr><td><b>Auto-draft replies (in your voice)</b></td><td><span class="pill P1">P1</span></td><td><b>Signature #1.</b> Needs-reply emails get a pre-generated draft to edit/send. Reuses triage + LLM.</td></tr>
+      <tr><td><b>NL free-slot scheduling</b></td><td><span class="pill P1">P1</span></td><td><b>Signature #2.</b> Agent reads calendar, finds open slots, proposes/sends invite at a real free time.</td></tr>
+      <tr><td><b>Modify / cancel events</b></td><td><span class="pill P2">P2</span></td><td>Reschedule/cancel with attendee notification.</td></tr>
+      <tr><td><b>Daily digest / morning brief</b></td><td><span class="pill P2">P2</span></td><td>Generated summary: needs-reply, today's meetings, conflicts.</td></tr>
+      <tr><td><b>Thread summarization</b></td><td><span class="pill P2">P2</span></td><td>Collapse long threads to key points + decisions + asks.</td></tr>
+    </tbody>
+  </table>
+  <div class="warn"><b>Scope discipline:</b> the two signature features (auto-draft, free-slot scheduling) are the chosen "wow." Digest + thread summary stay parked unless P0/P1 land early. Four shallow AI features lose; two polished ones win.</div>
+</section>
+
+<h2 id="arch">5. Architecture &amp; Key Decisions</h2>
+<section class="card">
+  <div class="grid">
+    <div class="feat"><h4>Auth</h4><div class="why">better-auth (existing). Corsair tenant id = <code>session.user.id</code>.</div></div>
+    <div class="feat"><h4>Integrations</h4><div class="why">Corsair multi-tenant OAuth; <code>corsair.withTenant(userId).gmail / .googlecalendar</code>.</div></div>
+    <div class="feat"><h4>Data freshness</h4><div class="why">Corsair webhooks → Postgres local cache. ngrok locally, deploy URL in prod.</div></div>
+    <div class="feat"><h4>Search</h4><div class="why">Hybrid: pgvector embeddings (OpenAI <code>text-embedding-3-small</code>) + Postgres full-text.</div></div>
+    <div class="feat"><h4>Agent</h4><div class="why">OpenAI Agents SDK + <code>OpenAIAgentsProvider</code> from <code>@corsair-dev/mcp</code> (per <code>docs/corsair/openai-agents.md</code>).</div></div>
+    <div class="feat"><h4>UX shell</h4><div class="why">Unified <code>cmdk</code> command bar routes commands vs natural language.</div></div>
+    <div class="feat"><h4>API layer</h4><div class="why">tRPC routers (existing <code>gmail</code>, <code>connections</code>) over Drizzle/Postgres.</div></div>
+    <div class="feat"><h4>Deploy</h4><div class="why">Vercel + hosted Postgres (Neon/Supabase) with pgvector.</div></div>
+  </div>
+  <div class="warn"><b>Docs rule:</b> for any Corsair API, read the matching file in <code>docs/corsair/</code> first. If a needed area (e.g. an MCP adapter detail) isn't covered, add the doc before coding — do not guess the API.</div>
+</section>
+
+<h2 id="triage">6. Triage Model (two-axis)</h2>
+<section class="card">
+  <p>Each incoming email is classified on ingest by a cheap LLM over subject + snippet, then stored in Postgres and combined into a sortable priority.</p>
+  <table>
+    <thead><tr><th>Axis</th><th>Values</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><b>Action</b></td><td><code>Needs reply</code> · <code>FYI</code> · <code>Ignore</code></td><td>What the user must <em>do</em>. Drives the triage view + auto-draft trigger.</td></tr>
+      <tr><td><b>Urgency</b></td><td><code>Urgent</code> · <code>Normal</code> · <code>Low</code></td><td>How time-sensitive. Drives sort order within actions.</td></tr>
+    </tbody>
+  </table>
+  <p class="muted">Combined priority sort: Needs-reply+Urgent → … → Ignore+Low. "Needs reply" emails auto-trigger a draft reply (Signature #1).</p>
+</section>
+
+<h2 id="roadmap">7. Step-by-Step Build Plan</h2>
+<section class="card">
+  <p class="muted">Strict dependency order. If the deadline hits mid-way, you still have a working keyboard-driven client on real data.</p>
+
+  <div class="phase">
+    <h3>Phase 0 — Foundation <span class="pill P0">P0</span> · Day 1</h3>
+    <ul>
+      <li>Land plan 001: Corsair OAuth connect for Gmail + Calendar (connect/callback routes, connections page).</li>
+      <li>Verify <code>corsair.withTenant(userId)</code> returns real data for both plugins.</li>
+      <li>Confirm Postgres + Drizzle schema, hosted DB, pgvector extension enabled.</li>
+    </ul>
+  </div>
+  <div class="phase">
+    <h3>Phase 1 — Real data flowing <span class="pill P0">P0</span> · Day 1–2</h3>
+    <ul>
+      <li>Set up Corsair webhooks (Gmail + Calendar) → persist to Postgres local cache. ngrok for local.</li>
+      <li>Inbox read over cached data; thread/email open view.</li>
+    </ul>
+  </div>
+  <div class="phase">
+    <h3>Phase 2 — Keyboard shell &amp; write actions <span class="pill P0">P0</span> · Day 2–3</h3>
+    <ul>
+      <li>Unified <code>cmdk</code> command bar; core shortcuts (navigate, compose, reply, search).</li>
+      <li>Email send / reply / draft. Calendar create + send invite.</li>
+    </ul>
+  </div>
+  <div class="phase">
+    <h3>Phase 3 — Agent <span class="pill P0">P0</span> · Day 3–4</h3>
+    <ul>
+      <li>Wire OpenAI Agents SDK + Corsair MCP provider; route NL from command bar to agent.</li>
+      <li>Validate the hero command: invite + email in one sentence.</li>
+    </ul>
+  </div>
+  <div class="phase">
+    <h3>Phase 4 — Intelligence &amp; speed <span class="pill P1">P1</span> · Day 4–5</h3>
+    <ul>
+      <li>Two-axis triage on ingest; priority inbox view.</li>
+      <li>Hybrid search (embed on ingest + full-text).</li>
+      <li>Email→invite one-shot.</li>
+      <li>Signature #1: auto-draft replies. Signature #2: NL free-slot scheduling.</li>
+    </ul>
+  </div>
+  <div class="phase">
+    <h3>Phase 5 — Stretch + ship <span class="pill P2">P2</span> · Day 5–6</h3>
+    <ul>
+      <li>If time: daily digest, thread summary, modify/cancel events.</li>
+      <li>Deploy to Vercel; production webhooks; polish.</li>
+      <li>Record YC-style demo video; README + Corsair-features + bonus list; X/LinkedIn posts.</li>
+    </ul>
+  </div>
+</section>
+
+<h2 id="scoring">8. Scoring Coverage</h2>
+<section class="card">
+  <div class="scorebar">
+    <span style="width:20%;background:#3a6df0" title="Corsair 20"></span>
+    <span style="width:15%;background:#5ad19a" title="Gmail 15"></span>
+    <span style="width:15%;background:#7ee0c0" title="Calendar 15"></span>
+    <span style="width:15%;background:#ffd166" title="Productivity 15"></span>
+    <span style="width:15%;background:#ff9f6b" title="AI/MCP 15"></span>
+    <span style="width:10%;background:#9aa3b2" title="Engineering 10"></span>
+    <span style="width:10%;background:#6ea8fe" title="Demo/Docs 10"></span>
+  </div>
+  <table>
+    <thead><tr><th>Bucket</th><th>Pts</th><th>How SlotNest earns it</th></tr></thead>
+    <tbody>
+      <tr><td>Corsair Integration</td><td>20</td><td>Multi-tenant OAuth, Gmail + Calendar plugins, webhooks, MCP.</td></tr>
+      <tr><td>Gmail Workflow</td><td>15</td><td>Triage inbox, send/reply/draft, auto-draft, hybrid search.</td></tr>
+      <tr><td>Calendar Workflow</td><td>15</td><td>Create/send invites, email→invite, free-slot scheduling.</td></tr>
+      <tr><td>Productivity UX</td><td>15</td><td>Unified ⌘K command bar, keyboard-first, sub-second search.</td></tr>
+      <tr><td>AI &amp; MCP</td><td>15</td><td>Agent chat via Corsair MCP, triage, auto-draft, NL scheduling.</td></tr>
+      <tr><td>Engineering Quality</td><td>10</td><td>tRPC + Drizzle, typed, webhook-driven, deployed.</td></tr>
+      <tr><td>Demo &amp; Docs</td><td>10</td><td>YC-style video, README, Corsair-feature + bonus list, social posts.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<h2 id="deliver">9. Deliverables &amp; Definition of Done</h2>
+<section class="card">
+  <ul>
+    <li>✅ Open-source GitHub repo.</li>
+    <li>✅ Deployed live link (Vercel) with working OAuth + webhooks.</li>
+    <li>✅ YC-style demo video: problem → solution → demo → stack → Corsair usage → Gmail → Calendar → what makes it better.</li>
+    <li>✅ README: short overview, setup, list of Corsair features used, bonus tasks attempted.</li>
+    <li>✅ X/Twitter + LinkedIn posts (tag ChaiCode, Hitesh, Piyush, Corsair; <code>#chaicode #corsair-dev</code>; "Builder Mode On | MacBook Giveaway Hackathon").</li>
+    <li>✅ No hardcoded data — every email/event is real, via Corsair.</li>
+  </ul>
+  <div class="callout"><b>Demo-ready bar:</b> the hero command ("invite + email in one sentence") works live on a real account, end-to-end, in under 30 seconds.</div>
+</section>
+
+<h2 id="risks">10. Risks &amp; Mitigations</h2>
+<section class="card">
+  <table>
+    <thead><tr><th>Risk</th><th>Mitigation</th></tr></thead>
+    <tbody>
+      <tr><td>Over-scope: too many features, all half-done.</td><td>Strict P0→P1→P2 order; signature features capped at 2; digest/summary parked.</td></tr>
+      <tr><td>Agent/MCP wiring unfamiliar.</td><td>Follow <code>docs/corsair/openai-agents.md</code> exactly; build agent only after read/write work standalone.</td></tr>
+      <tr><td>Webhooks flaky locally.</td><td>ngrok for dev; fall back to on-demand fetch for a view if a webhook lags (don't block UI).</td></tr>
+      <tr><td>Sending real email/invites in demo.</td><td>Use a dedicated test recipient (e.g. <code>@corsair.dev</code>); confirm-before-send for destructive agent actions.</td></tr>
+      <tr><td>Deploy/webhook config eats the last day.</td><td>Deploy by Phase 4, not Phase 5; verify prod webhooks early.</td></tr>
+      <tr><td>LLM latency on triage at ingest.</td><td>Cheap/fast model; score async on ingest, not on read path.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<footer>
+  SlotNest PRD · Draft v1 · 2026-06-12 · Glossary in <code>CONTEXT.md</code> · Corsair docs in <code>docs/corsair/</code>
+</footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,20 @@
+# SlotNest — Context Glossary
+
+The shared language for SlotNest. Terms only — no implementation details.
+
+## Core terms
+
+- **SlotNest** — A keyboard-first command center for Gmail + Google Calendar, built on Corsair. Not a clone; it reshapes email/calendar workflows around speed and AI assistance.
+- **User** — A person with a SlotNest account (authenticated via better-auth). The unit of identity inside SlotNest.
+- **Tenant** — A User as seen by Corsair. The Corsair tenant id equals the better-auth `session.user.id`. All integration calls are scoped to a tenant.
+- **Connection** — A User's authorized link to one external provider (Gmail or Google Calendar) through Corsair OAuth. v1: at most one of each provider per User.
+- **Command bar** — The unified cmd-K surface. Accepts both discrete commands (fuzzy actions/navigation) and natural-language sentences, which are routed to the Agent. The single primary entry point for the app.
+- **Agent** — The LLM-driven assistant (OpenAI Agents SDK + Corsair MCP) that performs email/calendar actions from natural language.
+- **Triage** — Classification of an incoming email along two axes: an **Action** label and an **Urgency** level. Combined into a sortable priority.
+  - **Action** — What the User must do about an email: `Needs reply` | `FYI` | `Ignore`.
+  - **Urgency** — How time-sensitive an email is: `Urgent` | `Normal` | `Low`.
+- **Draft reply** — An LLM-generated reply, matched to the User's tone, pre-prepared for `Needs reply` emails.
+- **Free-slot scheduling** — Finding open time on the User's calendar and proposing/sending an invite at a real free slot, from natural language.
+- **Email→invite** — A one-shot workflow turning an open email into a calendar invite to the sender (time/title extracted by LLM).
+- **Local cache** — Emails/events pushed via Corsair webhooks and persisted in Postgres; the source for fast local search (not live Gmail polling).
+- **Hybrid search** — Search combining semantic (pgvector embeddings) and keyword (Postgres full-text) over the local cache.
