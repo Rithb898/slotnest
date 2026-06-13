@@ -161,7 +161,6 @@
   }
   html {
     @apply font-sans;
-    scroll-behavior: smooth;
   }
 }
 
@@ -185,10 +184,6 @@
   0%, 100% { transform: translate3d(0, 0, 0) scale(1.05); }
   50% { transform: translate3d(-1.75rem, 1.25rem, 0) scale(0.96); }
 }
-@keyframes float-soft {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-0.6rem); }
-}
 @keyframes caret-blink {
   0%, 49% { opacity: 1; }
   50%, 100% { opacity: 0; }
@@ -201,11 +196,6 @@
   from { transform: translateX(-120%); }
   to { transform: translateX(220%); }
 }
-@keyframes hero-rise {
-  from { opacity: 0; transform: translateY(1.25rem); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
 .blob {
   position: absolute;
   border-radius: 50%;
@@ -216,47 +206,12 @@
 .blob--a { animation: drift-a 16s ease-in-out infinite; }
 .blob--b { animation: drift-b 19s ease-in-out infinite; }
 
-/* Glossy honey 3D orbs — crisp decorative objects flanking the hero */
-.orb {
-  position: absolute;
-  border-radius: 50%;
-  background:
-    radial-gradient(
-      circle at 32% 26%,
-      oklch(0.95 0.05 88),
-      oklch(0.76 0.14 74) 46%,
-      oklch(0.56 0.13 58) 100%
-    );
-  box-shadow:
-    inset -7px -9px 20px oklch(0.42 0.1 48 / 0.55),
-    inset 7px 9px 18px oklch(0.98 0.05 92 / 0.65),
-    0 22px 44px oklch(0.6 0.12 58 / 0.32);
-  will-change: transform;
-}
-.orb::after {
-  content: "";
-  position: absolute;
-  top: 14%;
-  left: 20%;
-  width: 30%;
-  height: 22%;
-  border-radius: 50%;
-  background: oklch(1 0 0 / 0.7);
-  filter: blur(5px);
-}
-
-.float-soft { animation: float-soft 7s ease-in-out infinite; will-change: transform; }
 .caret { animation: caret-blink 1.05s step-end infinite; }
 
 .marquee-track {
   display: flex;
   width: max-content;
   animation: marquee-track 38s linear infinite;
-}
-
-.hero-rise {
-  opacity: 0;
-  animation: hero-rise 0.85s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 .sheen-host { position: relative; overflow: hidden; }
@@ -297,14 +252,11 @@
 @media (prefers-reduced-motion: reduce) {
   .blob--a,
   .blob--b,
-  .float-soft,
   .caret,
   .marquee-track,
-  .hero-rise,
   .sheen-host:hover::after {
     animation: none !important;
   }
-  .hero-rise { opacity: 1; }
   [data-reveal="armed"] {
     opacity: 1;
     transform: none;

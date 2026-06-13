@@ -8,11 +8,11 @@ export function BentoGrid() {
       <Reveal>
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-balance leading-[1.05] tracking-tight">
-            <span className="block font-serif text-[2rem] font-light italic text-[#2c2c2c] sm:text-[2.75rem]">
-              Unlock the full potential
+            <span className="block font-serif text-[2rem] font-light italic text-foreground sm:text-[2.75rem]">
+              Know how your inbox
             </span>
-            <span className="block font-sans text-[2.1rem] font-bold tracking-tight text-[#2c2c2c] sm:text-[2.9rem]">
-              of your inbox
+            <span className="block font-sans text-[2.1rem] font-bold tracking-tight text-foreground sm:text-[2.9rem]">
+              is actually doing
             </span>
           </h2>
           <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-muted-foreground">
@@ -107,7 +107,7 @@ export function BentoGrid() {
           >
             <div className="absolute -right-8 -bottom-10 size-40 rounded-full border-[18px] border-white/10" />
             <div className="relative">
-              <span className="text-[0.7rem] font-bold uppercase tracking-wider text-white/80">
+              <span className="text-[0.74rem] font-semibold text-white/85">
                 Flow insights
               </span>
               <h3 className="mt-2 text-lg font-bold leading-tight text-white">

@@ -68,7 +68,7 @@ export function SiteFooter() {
       <div className="relative mx-auto w-full max-w-7xl px-5 sm:px-8">
         <div
           aria-hidden
-          className="pointer-events-none -mb-[0.18em] select-none whitespace-nowrap text-center font-serif font-bold leading-none tracking-tighter text-white"
+          className="pointer-events-none mb-[-0.18em] select-none whitespace-nowrap text-center font-serif font-bold leading-none tracking-tighter text-white"
           style={{ fontSize: "clamp(5rem, 23vw, 22rem)" }}
         >
           SlotNest

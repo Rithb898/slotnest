@@ -7,6 +7,7 @@ import {
   ChevronRight,
   HelpCircle,
   Inbox,
+  Mail,
   Settings,
   Sparkles,
   TrendingUp,
@@ -33,64 +34,35 @@ export function Hero() {
       </div>
 
       <div className="relative mx-auto max-w-7xl">
-        {/* Flanking 3D prop - Left */}
-        <div className="absolute -left-6 top-[26%] -z-10 size-44 pointer-events-none hidden lg:block float-soft">
-          <div
-            className="orb size-full"
-            style={{
-              background:
-                "radial-gradient(circle at 30% 28%, oklch(0.86 0.08 90), oklch(0.70 0.13 75), oklch(0.48 0.12 58))",
-              boxShadow:
-                "inset -8px -10px 24px rgba(0,0,0,0.32), inset 8px 10px 18px rgba(255,255,255,0.65), 0 28px 50px rgba(217,154,60,0.22)",
-            }}
-          />
-        </div>
-
-        {/* Flanking 3D prop - Right */}
-        <div
-          className="absolute -right-4 top-[34%] -z-10 size-40 pointer-events-none hidden lg:block float-soft"
-          style={{ animationDelay: "1.5s" }}
-        >
-          <div
-            className="orb size-full"
-            style={{
-              background:
-                "radial-gradient(circle at 30% 28%, oklch(0.88 0.08 95), oklch(0.74 0.13 75), oklch(0.50 0.11 68))",
-              boxShadow:
-                "inset -8px -10px 24px rgba(0,0,0,0.32), inset 8px 10px 18px rgba(255,255,255,0.65), 0 28px 50px rgba(217,154,60,0.22)",
-            }}
-          />
-        </div>
-
         {/* Hero typography block */}
         <div className="mx-auto max-w-3xl text-center">
           <h1 className="text-balance leading-none tracking-tight">
-            <span className="block font-serif text-[2.5rem] font-light italic text-[#2c2c2c] sm:text-[3.75rem] lg:text-[4.5rem] leading-[1.15]">
-              Revolutionize Your Inbox
+            <span className="block text-[2.5rem] font-semibold text-foreground sm:text-[3.75rem] lg:text-[4.5rem] leading-[1.15] tracking-tight">
+              Inbox to zero,
             </span>
-            <span className="mt-2 block font-sans text-[2.75rem] font-bold text-[#2c2c2c] sm:text-[4rem] lg:text-[4.75rem] leading-[1.05] tracking-tighter">
-              with Next-Gen Speed
+            <span className="mt-2 block text-[2.75rem] font-extrabold text-foreground sm:text-[4rem] lg:text-[4.75rem] leading-[1.05] tracking-tighter">
+              before your coffee.
             </span>
           </h1>
 
           <p className="mx-auto mt-6 max-w-xl text-pretty text-sm sm:text-base leading-relaxed text-muted-foreground">
-            Our cutting-edge command center provides deep AI triage and fast
-            scheduling to boost your daily email productivity.
+            SlotNest sorts your mail by what to do and when, drafts replies in
+            your voice, and books real free time — all from one ⌘K command bar.
           </p>
 
           <div className="mt-8 flex items-center justify-center gap-3">
             <Link
               href="/sign-up"
-              className="inline-flex h-11 items-center gap-2 rounded-full bg-[#1c1c1c] px-7 text-xs font-bold text-white transition-all hover:bg-[#2d2d2d] active:translate-y-px"
+              className="inline-flex h-11 items-center gap-2 rounded-md bg-primary px-7 font-semibold text-sm text-foreground transition-all hover:bg-primary/90 active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
-              Get Started Now
+              Get started free
               <ArrowRight className="size-3.5" />
             </Link>
             <Link
-              href="#demo"
-              className="inline-flex h-11 items-center gap-2 rounded-full border border-border bg-white px-6 text-xs font-bold text-[#2c2c2c] transition-all hover:bg-secondary active:translate-y-px"
+              href="#how"
+              className="inline-flex h-11 items-center gap-2 rounded-md bg-background px-6 font-semibold text-sm text-foreground transition-all hover:bg-secondary active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
-              Watch Demo
+              See how it works
             </Link>
           </div>
         </div>
@@ -286,29 +258,33 @@ function HeroDashboard() {
             </div>
           </div>
 
-          {/* Upgrade plan card */}
-          <div
-            className="rounded-xl p-4 text-white relative overflow-hidden flex flex-col justify-between h-[120px] shadow-sm"
-            style={{
-              background:
-                "linear-gradient(135deg, oklch(0.70 0.13 75) 0%, oklch(0.65 0.12 70) 100%)",
-            }}
-          >
-            <div className="absolute right-[-10px] bottom-[-10px] size-24 rounded-full border-[10px] border-white/10" />
-            <div>
-              <h3 className="text-xs font-bold text-[#2c2c2c] leading-tight">
-                Upgrade your plan
-              </h3>
-              <p className="text-[0.65rem] text-[#2c2c2c]/80 mt-1 max-w-[140px]">
-                Get unlimited AI drafts and fast calendar integrations
-              </p>
+          {/* Connected accounts card */}
+          <div className="rounded-xl border border-border bg-white p-4 shadow-sm flex flex-col justify-between h-[120px]">
+            <div className="flex items-center justify-between">
+              <span className="text-[0.7rem] font-semibold text-muted-foreground">
+                Connected accounts
+              </span>
+              <span className="flex items-center gap-1.5 text-[0.62rem] font-semibold text-[#4c9b6b]">
+                <span className="size-1.5 rounded-full bg-[#4c9b6b]" />
+                Synced
+              </span>
             </div>
-            <button
-              type="button"
-              className="bg-[#1c1c1c] text-white hover:bg-black font-semibold text-[0.68rem] py-1.5 px-3 rounded-lg w-max transition-colors"
-            >
-              Go Premium
-            </button>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-[0.72rem] font-medium text-foreground">
+                <Mail className="size-3.5 text-honey-ink" />
+                Gmail
+                <span className="ml-auto font-mono text-[0.62rem] text-muted-foreground">
+                  1,284 mails
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-[0.72rem] font-medium text-foreground">
+                <Calendar className="size-3.5 text-honey-ink" />
+                Google Calendar
+                <span className="ml-auto font-mono text-[0.62rem] text-muted-foreground">
+                  16 events
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -345,8 +321,8 @@ function HeroDashboard() {
               <div className="rounded-xl border border-border/80 bg-[#f8f6f2] p-4 flex flex-col gap-3 flex-1 justify-center relative overflow-hidden">
                 <div className="absolute top-[-40px] right-[-40px] size-40 rounded-full border-4 border-white/5 opacity-40" />
                 <div>
-                  <span className="text-[0.65rem] font-bold text-muted-foreground uppercase tracking-wider">
-                    AI ASSISTANT DRAFT
+                  <span className="text-[0.68rem] font-semibold text-muted-foreground">
+                    AI assistant draft
                   </span>
                   <h2 className="text-base font-bold text-[#2c2c2c] mt-0.5">
                     Automate, Reply, Outperform
@@ -389,7 +365,7 @@ function HeroDashboard() {
 
               {/* AI Reports Circular Gauges */}
               <div>
-                <h4 className="text-[0.7rem] font-bold text-muted-foreground uppercase tracking-wider mb-3">
+                <h4 className="text-[0.72rem] font-semibold text-muted-foreground mb-3">
                   AI triage health
                 </h4>
                 <div className="grid grid-cols-3 gap-2">
