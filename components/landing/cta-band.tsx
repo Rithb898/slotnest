@@ -10,11 +10,11 @@ export function CtaBand() {
           {/* One warm light — the brand's honey, off in the corner */}
           <div aria-hidden className="pointer-events-none absolute inset-0">
             <div
-              className="absolute -right-24 top-1/2 size-[420px] -translate-y-1/2 rounded-full opacity-60 blur-3xl"
+              className="absolute -right-24 top-1/2 size-105 -translate-y-1/2 rounded-full opacity-60 blur-3xl"
               style={{ background: "oklch(0.70 0.13 75 / 0.40)" }}
             />
             <div
-              className="absolute -left-20 -top-20 size-[320px] rounded-full opacity-40 blur-3xl"
+              className="absolute -left-20 -top-20 size-80 rounded-full opacity-40 blur-3xl"
               style={{ background: "oklch(0.70 0.13 75 / 0.18)" }}
             />
           </div>

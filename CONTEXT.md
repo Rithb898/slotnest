@@ -4,7 +4,9 @@ The shared language for SlotNest. Terms only — no implementation details.
 
 ## Core terms
 
-- **SlotNest** — A keyboard-first command center for Gmail + Google Calendar, built on Corsair. Not a clone; it reshapes email/calendar workflows around speed and AI assistance.
+- **SlotNest** — An AI-native, keyboard-first command center for Gmail + Google Calendar, built on Corsair. Not a clone; it reshapes email/calendar workflows around speed and AI assistance.
+- **Approve, don't read** — The core interaction model. The AI prepares a decision (triage, draft reply, proposed invite); the User confirms it with one keypress. Surfaces present actions, not raw messages. Inbox-zero by approval, not by reading. For v1, nothing outbound sends or books without a human keypress.
+- **Today** — The home surface (`/today`) for a connected User. Shows what needs the User now: emails needing reply (with drafts ready to approve), today's events with free gaps surfaced, and an inline entry into the Agent. Triages; the dedicated pages do the work. Not a metric-card dashboard.
 - **User** — A person with a SlotNest account (authenticated via better-auth). The unit of identity inside SlotNest.
 - **Tenant** — A User as seen by Corsair. The Corsair tenant id equals the better-auth `session.user.id`. All integration calls are scoped to a tenant.
 - **Connection** — A User's authorized link to one external provider (Gmail or Google Calendar) through Corsair OAuth. v1: at most one of each provider per User.

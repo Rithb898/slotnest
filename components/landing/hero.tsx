@@ -259,7 +259,7 @@ function HeroDashboard() {
           </div>
 
           {/* Connected accounts card */}
-          <div className="rounded-xl border border-border bg-white p-4 shadow-sm flex flex-col justify-between h-[120px]">
+          <div className="rounded-xl border border-border bg-white p-4 shadow-sm flex flex-col justify-between h-30">
             <div className="flex items-center justify-between">
               <span className="text-[0.7rem] font-semibold text-muted-foreground">
                 Connected accounts
@@ -290,7 +290,7 @@ function HeroDashboard() {
 
         {/* Column 2: Dashboard Content Panel */}
         <div className="flex flex-col gap-4">
-          <div className="rounded-xl border border-border bg-white shadow-sm flex-1 flex flex-col min-h-[380px]">
+          <div className="rounded-xl border border-border bg-white shadow-sm flex-1 flex flex-col min-h-95">
             {/* Inner navigation bar */}
             <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
               <div className="flex gap-2">
@@ -319,7 +319,7 @@ function HeroDashboard() {
             {/* Showcase details */}
             <div className="flex-1 p-5 flex flex-col gap-4">
               <div className="rounded-xl border border-border/80 bg-[#f8f6f2] p-4 flex flex-col gap-3 flex-1 justify-center relative overflow-hidden">
-                <div className="absolute top-[-40px] right-[-40px] size-40 rounded-full border-4 border-white/5 opacity-40" />
+                <div className="absolute -top-10 -right-10 size-40 rounded-full border-4 border-white/5 opacity-40" />
                 <div>
                   <span className="text-[0.68rem] font-semibold text-muted-foreground">
                     AI assistant draft

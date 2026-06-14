@@ -105,7 +105,7 @@ export function BentoGrid() {
                 "linear-gradient(140deg, oklch(0.62 0.15 150), oklch(0.5 0.13 150))",
             }}
           >
-            <div className="absolute -right-8 -bottom-10 size-40 rounded-full border-[18px] border-white/10" />
+            <div className="absolute -right-8 -bottom-10 size-40 rounded-full border-18 border-white/10" />
             <div className="relative">
               <span className="text-[0.74rem] font-semibold text-white/85">
                 Flow insights

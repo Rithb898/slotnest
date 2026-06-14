@@ -103,7 +103,9 @@ components:
 
 **Creative North Star: "The Quiet Desk"**
 
-SlotNest is the clean desk you sit down to at the start of the day — everything in its place, warm light from one side, nothing competing for attention. It is a keyboard-first command center for Gmail and Google Calendar built for non-technical people first, so the interface has to feel obvious before it feels clever. The system organizes around one principle: the tool disappears into the task. Honey-amber is the single warm light in the room — it marks the one thing you should act on, and nothing else.
+SlotNest is the clean desk you sit down to at the start of the day — everything in its place, warm light from one side, nothing competing for attention. It is an AI-native, keyboard-first command center for Gmail and Google Calendar built for non-technical people first, so the interface has to feel obvious before it feels clever. The system organizes around one principle: the tool disappears into the task. Honey-amber is the single warm light in the room — it marks the one thing you should act on, and nothing else.
+
+The product is built around **approve, don't read**: the AI prepares the decision — triaged priority, a drafted reply, a proposed invite at a real free slot — and the user confirms with a single keypress. Screens present *actions*, not raw messages. This is the deliberate opposite of Superhuman's "faster inbox / memorize 40 shortcuts" (expert-only); here, the fast path is plain English in the command bar, and keyboard-first never means expert-only. The home surface (`/today`) is this approve-don't-read loop, **not** a metric-card dashboard — those are forbidden (§6).
 
 Density is calm, not cramped. Surfaces are flat by default; depth appears only as a response to state (hover, focus, the selected row). Speed is felt through fewer clicks and visible keyboard accelerators, never through a dense, intimidating "power-tool" wall of controls. Every screen should be understandable on first sight, with one obvious primary action and advanced options tucked away until asked for.
 
