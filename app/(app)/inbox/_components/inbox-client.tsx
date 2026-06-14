@@ -1,24 +1,114 @@
 "use client";
-import { useState } from "react";
+import { Archive, CalendarPlus, PenLine, Reply } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { TriageChips } from "@/components/triage-chips";
+import { Kbd } from "@/components/ui/kbd";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import type { TriageAction } from "@/lib/triage";
 import { cn } from "@/lib/utils";
 import { api } from "@/trpc/react";
 
+type SmartView = "needs-reply" | "fyi" | "all";
+
+const VIEW_FILTER: Record<SmartView, (action: TriageAction) => boolean> = {
+  "needs-reply": (a) => a === "Needs reply",
+  fyi: (a) => a === "FYI",
+  all: () => true,
+};
+
 export function InboxClient() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [view, setView] = useState<SmartView>("all");
   const inbox = api.gmail.inbox.useQuery({});
 
+  const messages = useMemo(() => {
+    if (!inbox.data) return [];
+    return inbox.data.messages.filter((m) =>
+      VIEW_FILTER[view](m.triage.action),
+    );
+  }, [inbox.data, view]);
+
+  // Keyboard nav (j/k move, ↵ open, e archive, r reply, c compose). Hints are
+  // visible in the action bar; the keyboard path is never required.
+  const selectedIndex = messages.findIndex((m) => m.id === selectedId);
+  const listRef = useRef<HTMLUListElement>(null);
+
+  const move = useCallback(
+    (delta: number) => {
+      if (messages.length === 0) return;
+      const next =
+        selectedIndex < 0
+          ? 0
+          : Math.min(Math.max(selectedIndex + delta, 0), messages.length - 1);
+      setSelectedId(messages[next]?.id ?? null);
+    },
+    [messages, selectedIndex],
+  );
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      // Don't hijack typing in inputs or when the command bar is open.
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      switch (e.key) {
+        case "j":
+          e.preventDefault();
+          move(1);
+          break;
+        case "k":
+          e.preventDefault();
+          move(-1);
+          break;
+        // e (archive) / r (reply) / c (compose) are placeholders — wired in the
+        // action bar as no-ops for now (no Corsair write contract yet).
+        default:
+          break;
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [move]);
+
   return (
-    <div className="flex h-svh w-full">
+    <div className="flex h-full w-full">
       {/* List pane */}
       <aside className="flex w-full max-w-sm flex-col border-r border-border">
-        <header className="flex items-center justify-between border-b border-border px-4 py-3">
-          <h1 className="text-sm font-semibold">Inbox</h1>
-          {inbox.data ? (
-            <span className="text-xs text-muted-foreground">
-              {inbox.data.messages.length}
-            </span>
-          ) : null}
+        <header className="flex flex-col gap-2 border-b border-border px-4 py-3">
+          <div className="flex items-center justify-between">
+            <h1 className="text-base font-semibold">Inbox</h1>
+            {inbox.data ? (
+              <span className="font-mono text-xs text-muted-foreground">
+                {messages.length}
+              </span>
+            ) : null}
+          </div>
+          <Tabs value={view} onValueChange={(v) => setView(v as SmartView)}>
+            <TabsList className="w-full">
+              <TabsTrigger value="needs-reply" className="flex-1">
+                Needs reply
+              </TabsTrigger>
+              <TabsTrigger value="fyi" className="flex-1">
+                FYI
+              </TabsTrigger>
+              <TabsTrigger value="all" className="flex-1">
+                All
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         </header>
         <div className="flex-1 overflow-y-auto">
           {inbox.isLoading ? (
@@ -27,20 +117,26 @@ export function InboxClient() {
             <p className="p-4 text-sm text-destructive">
               Couldn&apos;t load your inbox. Is Gmail connected?
             </p>
-          ) : inbox.data.messages.length === 0 ? (
+          ) : messages.length === 0 ? (
             <p className="p-4 text-sm text-muted-foreground">No messages.</p>
           ) : (
-            <ul>
-              {inbox.data.messages.map((m) => (
+            <ul ref={listRef}>
+              {messages.map((m) => (
                 <li key={m.id}>
                   <button
                     type="button"
                     onClick={() => setSelectedId(m.id)}
                     className={cn(
-                      "flex w-full flex-col gap-0.5 border-b border-border px-4 py-3 text-left transition-colors hover:bg-muted/50",
-                      selectedId === m.id && "bg-muted",
+                      "relative flex w-full flex-col gap-0.5 border-b border-border px-4 py-3 text-left transition-colors hover:bg-accent",
+                      selectedId === m.id && "bg-accent",
                     )}
                   >
+                    {selectedId === m.id ? (
+                      <span
+                        className="absolute left-0 top-1/2 h-7 w-0.5 -translate-y-1/2 rounded-full bg-primary"
+                        aria-hidden
+                      />
+                    ) : null}
                     <div className="flex items-center justify-between gap-2">
                       <span
                         className={cn(
@@ -50,7 +146,7 @@ export function InboxClient() {
                       >
                         {m.fromName || m.fromEmail}
                       </span>
-                      <span className="shrink-0 text-xs text-muted-foreground">
+                      <span className="shrink-0 font-mono text-xs text-muted-foreground">
                         {formatDate(m.date)}
                       </span>
                     </div>
@@ -62,15 +158,30 @@ export function InboxClient() {
                     >
                       {m.subject}
                     </span>
-                    <span className="truncate text-xs text-muted-foreground">
-                      {m.snippet}
-                    </span>
+                    <div className="mt-1 flex items-center justify-between gap-2">
+                      <span className="truncate text-xs text-muted-foreground">
+                        {m.snippet}
+                      </span>
+                      <TriageChips
+                        action={m.triage.action}
+                        urgency={m.triage.urgency}
+                      />
+                    </div>
                   </button>
                 </li>
               ))}
             </ul>
           )}
         </div>
+        <footer className="flex items-center gap-3 border-t border-border px-4 py-2 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <Kbd>j</Kbd>
+            <Kbd>k</Kbd> move
+          </span>
+          <span className="flex items-center gap-1">
+            <Kbd>↵</Kbd> open
+          </span>
+        </footer>
       </aside>
 
       {/* Reading pane */}
@@ -114,12 +225,15 @@ function MessageView({ id }: { id: string }) {
         <h2 className="text-lg font-semibold">{m.subject}</h2>
         <p className="mt-1 text-sm">
           <span className="font-medium">{m.fromName || m.fromEmail}</span>{" "}
-          <span className="text-muted-foreground">&lt;{m.fromEmail}&gt;</span>
+          <span className="font-mono text-muted-foreground">
+            &lt;{m.fromEmail}&gt;
+          </span>
         </p>
-        <p className="text-xs text-muted-foreground">
+        <p className="font-mono text-xs text-muted-foreground">
           {formatDate(m.date, true)}
         </p>
       </header>
+      <ActionBar />
       <div className="flex-1 overflow-y-auto">
         {m.html ? (
           <iframe
@@ -135,6 +249,73 @@ function MessageView({ id }: { id: string }) {
         )}
       </div>
     </>
+  );
+}
+
+/**
+ * Reading-pane action bar (DESIGN: "/inbox upgrades").
+ *
+ * Buttons render but are placeholders for this version: Draft reply and
+ * → Invite depend on the deferred Agent; Archive and Reply depend on Corsair
+ * write contracts that aren't documented yet (a STOP condition to invent).
+ * They are disabled with explanatory tooltips rather than wired to any write.
+ */
+function ActionBar() {
+  return (
+    <div className="flex items-center gap-1 border-b border-border px-6 py-2">
+      <PlaceholderAction
+        icon={PenLine}
+        label="Draft reply"
+        reason="Needs the AI assistant (coming soon)"
+      />
+      <PlaceholderAction
+        icon={CalendarPlus}
+        label="→ Invite"
+        reason="Needs the AI assistant (coming soon)"
+      />
+      <PlaceholderAction
+        icon={Archive}
+        label="Archive"
+        reason="Sending/archiving isn't wired yet"
+        shortcut="e"
+      />
+      <PlaceholderAction
+        icon={Reply}
+        label="Reply"
+        reason="Sending isn't wired yet"
+        shortcut="r"
+      />
+    </div>
+  );
+}
+
+function PlaceholderAction({
+  icon: Icon,
+  label,
+  reason,
+  shortcut,
+}: {
+  icon: typeof PenLine;
+  label: string;
+  reason: string;
+  shortcut?: string;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger render={<span />}>
+        {/* Render as a span so the tooltip works on a disabled button. */}
+        <button
+          type="button"
+          disabled
+          className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-foreground opacity-50"
+        >
+          <Icon className="size-4" />
+          {label}
+          {shortcut ? <Kbd className="ml-1">{shortcut}</Kbd> : null}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>{reason}</TooltipContent>
+    </Tooltip>
   );
 }
 

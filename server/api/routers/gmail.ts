@@ -7,6 +7,7 @@ import {
   parseAddress,
   toDate,
 } from "@/lib/gmail";
+import { triage } from "@/lib/triage";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { corsair } from "@/server/corsair";
 
@@ -52,15 +53,29 @@ export const gmailRouter = createTRPCRouter({
           });
           const headers = msg.payload?.headers;
           const from = parseAddress(getHeader(headers, "From"));
+          const subject = getHeader(headers, "Subject") ?? "(no subject)";
+          const snippet = msg.snippet ?? "";
+          const date = toDate(msg.internalDate);
+          const unread = (msg.labelIds ?? []).includes("UNREAD");
+          // Heuristic triage (no LLM) — see lib/triage.ts. Computed per-request;
+          // cheap enough that a local cache isn't warranted yet.
+          const labels = triage({
+            subject,
+            snippet,
+            fromEmail: from.email,
+            unread,
+            date,
+          });
           return {
             id: msg.id ?? id,
             threadId: msg.threadId ?? null,
             fromName: from.name,
             fromEmail: from.email,
-            subject: getHeader(headers, "Subject") ?? "(no subject)",
-            snippet: msg.snippet ?? "",
-            date: toDate(msg.internalDate),
-            unread: (msg.labelIds ?? []).includes("UNREAD"),
+            subject,
+            snippet,
+            date,
+            unread,
+            triage: labels,
           };
         }),
       );
