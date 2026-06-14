@@ -1,6 +1,6 @@
 import { CalendarClock, Command, Inbox, Reply, Sparkles } from "lucide-react";
-import { Chip, SectionHeading } from "@/components/landing/shared";
 import { Reveal } from "@/components/landing/reveal";
+import { Chip, SectionHeading } from "@/components/landing/shared";
 
 export function Showcase() {
   return (

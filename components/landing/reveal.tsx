@@ -1,6 +1,7 @@
 "use client";
 
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { motion } from "motion/react";
+import type { ReactNode } from "react";
 
 type RevealProps = {
   children: ReactNode;
@@ -11,10 +12,12 @@ type RevealProps = {
   className?: string;
 };
 
+const EASE = [0.22, 1, 0.36, 1] as const;
+
 /**
- * Scroll-reveal wrapper. Content renders fully visible by default (SSR / no-JS /
- * reduced-motion / headless all see it), and only arms the hidden state once the
- * client confirms motion is wanted — so a reveal can never ship the section blank.
+ * Scroll-reveal wrapper, powered by motion's `whileInView`. Fades and lifts its
+ * content into place the first time it enters the viewport. Respects the user's
+ * reduced-motion preference via the global <MotionConfig reducedMotion="user">.
  */
 export function Reveal({
   children,
@@ -22,45 +25,26 @@ export function Reveal({
   as = "div",
   className,
 }: RevealProps) {
-  const ref = useRef<HTMLElement | null>(null);
-  const [state, setState] = useState<"idle" | "armed" | "shown">("idle");
+  const motionProps = {
+    className,
+    initial: { opacity: 0, y: 24 },
+    whileInView: { opacity: 1, y: 0 },
+    viewport: { once: true, amount: 0.2, margin: "0px 0px -8% 0px" },
+    transition: { duration: 0.6, delay: delay / 1000, ease: EASE },
+  } as const;
 
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-
-    const prefersReduced = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
-    if (prefersReduced || !("IntersectionObserver" in window)) {
-      setState("shown");
-      return;
-    }
-
-    // Arm the hidden state, then observe entry into the viewport.
-    setState("armed");
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) {
-          setState("shown");
-          io.disconnect();
-        }
-      },
-      { threshold: 0.15, rootMargin: "0px 0px -8% 0px" },
+  if (as === "li") {
+    return <motion.li {...motionProps}>{children}</motion.li>;
+  }
+  if (as === "span") {
+    return (
+      <motion.span
+        {...motionProps}
+        className={`inline-block ${className ?? ""}`}
+      >
+        {children}
+      </motion.span>
     );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
-
-  const Tag = as;
-  return (
-    <Tag
-      ref={ref as never}
-      data-reveal={state === "idle" ? undefined : state}
-      style={delay ? { transitionDelay: `${delay}ms` } : undefined}
-      className={className}
-    >
-      {children}
-    </Tag>
-  );
+  }
+  return <motion.div {...motionProps}>{children}</motion.div>;
 }

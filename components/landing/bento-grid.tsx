@@ -4,7 +4,7 @@ import { Reveal } from "@/components/landing/reveal";
 
 export function BentoGrid() {
   return (
-    <section className="rounded-[2.5rem] bg-[#f4f4f2] px-5 py-16 sm:px-10 sm:py-20">
+    <section className="rounded-[2.5rem] border border-border bg-muted px-5 py-16 sm:px-10 sm:py-20">
       <Reveal>
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-balance leading-[1.05] tracking-tight">

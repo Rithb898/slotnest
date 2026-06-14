@@ -1,6 +1,6 @@
 import { Command, Link2, Sparkles, Zap } from "lucide-react";
-import { SectionHeading } from "@/components/landing/shared";
 import { Reveal } from "@/components/landing/reveal";
+import { SectionHeading } from "@/components/landing/shared";
 
 const STEPS = [
   {

@@ -1,6 +1,6 @@
 import { Faq } from "@/components/landing/faq";
-import { SectionHeading } from "@/components/landing/shared";
 import { Reveal } from "@/components/landing/reveal";
+import { SectionHeading } from "@/components/landing/shared";
 
 export function FaqSection() {
   return (

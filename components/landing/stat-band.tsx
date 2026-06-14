@@ -9,39 +9,39 @@ export function StatBand() {
   return (
     <section className="mx-auto w-full max-w-7xl px-5 sm:px-8">
       <Reveal>
-        <div className="relative overflow-hidden rounded-[2rem] bg-[#1c1c1c] sm:h-105">
+        <div className="relative overflow-hidden rounded-[2rem] border border-border bg-muted p-6 sm:h-105 sm:p-10">
           {/* One warm light, low in the corner — the brand's honey, never a new hue */}
           <div
             aria-hidden
-            className="pointer-events-none absolute -bottom-32 -right-24 size-115 rounded-full opacity-60 blur-3xl"
-            style={{ background: "oklch(0.70 0.13 75 / 0.45)" }}
+            className="pointer-events-none absolute -right-24 -bottom-32 size-115 rounded-full opacity-50 blur-3xl"
+            style={{ background: "oklch(0.85 0.12 92 / 0.5)" }}
           />
 
           {/* Giant accent figure */}
           <span
             aria-hidden
-            className="pointer-events-none absolute -bottom-6 left-1/2 -translate-x-1/2 select-none font-sans text-[12rem] font-black leading-none tracking-tighter text-white/6 sm:text-[16rem]"
+            className="pointer-events-none absolute -bottom-6 left-1/2 -translate-x-1/2 select-none font-sans text-[12rem] font-black leading-none tracking-tighter text-foreground/5 sm:text-[16rem]"
           >
             4×
           </span>
 
-          <div className="relative flex h-full flex-col justify-between gap-8 p-6 sm:flex-row sm:items-stretch sm:p-10">
+          <div className="relative flex h-full flex-col justify-between gap-8 sm:flex-row sm:items-stretch">
             {/* Left: stat cards */}
             <div className="flex max-w-60 flex-col gap-3">
               {FLOWS.map((f) => (
                 <div
                   key={f.label}
-                  className="rounded-2xl border border-white/10 bg-white/6 p-4"
+                  className="rounded-2xl border border-border bg-background p-4 shadow-sm"
                 >
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-[0.82rem] font-medium text-white/75">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="text-[0.82rem] font-medium text-muted-foreground">
                       {f.label}
                     </span>
-                    <span className="text-lg font-bold text-white">
+                    <span className="text-lg font-bold text-foreground">
                       {f.value}
                     </span>
                   </div>
-                  <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                  <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
                     <div
                       className="h-full rounded-full"
                       style={{ width: f.width, background: f.tone }}
@@ -53,14 +53,14 @@ export function StatBand() {
 
             {/* Right: headline */}
             <div className="text-right sm:flex sm:flex-col sm:justify-center">
-              <h2 className="font-serif text-[2.5rem] font-light italic leading-[1.05] text-white sm:text-[3.5rem]">
+              <h2 className="font-serif text-[2.5rem] font-light italic leading-[1.05] text-foreground sm:text-[3.5rem]">
                 Replies sent
                 <br />
-                <span className="font-sans font-bold not-italic text-[#e6a64d]">
+                <span className="font-sans font-bold text-honey-ink not-italic">
                   four times faster.
                 </span>
               </h2>
-              <p className="mt-3 text-[0.95rem] leading-relaxed text-white/60 sm:max-w-xs sm:self-end">
+              <p className="mt-3 text-[0.95rem] leading-relaxed text-muted-foreground sm:max-w-xs sm:self-end">
                 Draft-ready answers cut the time from open to send.
               </p>
             </div>

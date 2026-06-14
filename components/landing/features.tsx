@@ -1,7 +1,7 @@
 import { CalendarClock, Check, Reply, Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
-import { Chip } from "@/components/landing/shared";
 import { Reveal } from "@/components/landing/reveal";
+import { Chip } from "@/components/landing/shared";
 
 export function Features() {
   return (

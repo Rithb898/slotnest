@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactLenis } from "lenis/react";
+import { MotionConfig } from "motion/react";
 import type { ReactNode } from "react";
 
 export function LenisProvider({ children }: { children: ReactNode }) {
@@ -13,7 +14,7 @@ export function LenisProvider({ children }: { children: ReactNode }) {
         smoothWheel: true,
       }}
     >
-      {children}
+      <MotionConfig reducedMotion="user">{children}</MotionConfig>
     </ReactLenis>
   );
 }
