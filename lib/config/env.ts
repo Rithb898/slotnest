@@ -13,9 +13,7 @@ export const env = createEnv({
     RESEND_API_KEY: z.string(),
     EMAIL_FROM: z.string(),
     APP_URL: z.url(),
-    // Optional: powers the ⌘K natural-language agent. The app stays valid
-    // without it; the agent route degrades to "not configured" when unset.
-    OPENAI_API_KEY: z.string().optional(),
+    OPENAI_API_KEY: z.string(),
   },
   client: {},
   runtimeEnv: {

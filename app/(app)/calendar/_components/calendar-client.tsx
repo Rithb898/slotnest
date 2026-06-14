@@ -7,6 +7,7 @@ import { InviteDialog, type InviteDraft } from "@/components/invite-dialog";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CALENDAR_POLL_OPTIONS } from "@/lib/query-options";
 import { api } from "@/trpc/react";
 
 /**
@@ -76,8 +77,11 @@ export function CalendarClient() {
     return { timeMin: min.toISOString(), timeMax: max.toISOString() };
   }, [selectedDay]);
 
-  const eventsQuery = api.calendar.events.useQuery(range);
-  const availabilityQuery = api.calendar.availability.useQuery(range);
+  const eventsQuery = api.calendar.events.useQuery(range, CALENDAR_POLL_OPTIONS);
+  const availabilityQuery = api.calendar.availability.useQuery(
+    range,
+    CALENDAR_POLL_OPTIONS,
+  );
 
   const connected = eventsQuery.data?.connected ?? true;
 
@@ -240,7 +244,7 @@ function NotConnected() {
   return (
     <div className="rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
       Google Calendar isn&apos;t connected yet.{" "}
-      <a href="/connections" className="text-[var(--honey-ink)] underline">
+      <a href="/settings" className="text-[var(--honey-ink)] underline">
         Connect it
       </a>{" "}
       to see your events and free gaps.

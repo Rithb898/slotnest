@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -10,6 +11,26 @@ import {
 import { triage } from "@/lib/triage";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { corsair } from "@/server/corsair";
+import { db } from "@/server/db";
+import { corsairAccounts, corsairIntegrations } from "@/server/db/schema";
+
+/**
+ * Returns true if the signed-in tenant has a gmail account. Mirrors
+ * `isCalendarConnected` in `server/api/routers/calendar.ts` — checking Corsair's
+ * own account tables (same source as `connections.list`) so the read procedures
+ * can degrade gracefully instead of letting the Corsair API call throw.
+ */
+async function isGmailConnected(userId: string): Promise<boolean> {
+  const rows = await db
+    .select({ name: corsairIntegrations.name })
+    .from(corsairAccounts)
+    .innerJoin(
+      corsairIntegrations,
+      eq(corsairAccounts.integrationId, corsairIntegrations.id),
+    )
+    .where(eq(corsairAccounts.tenantId, userId));
+  return rows.some((r) => r.name === "gmail");
+}
 
 export const gmailRouter = createTRPCRouter({
   /**
@@ -32,6 +53,14 @@ export const gmailRouter = createTRPCRouter({
         .optional(),
     )
     .query(async ({ ctx, input }) => {
+      if (!(await isGmailConnected(ctx.session.user.id))) {
+        return {
+          connected: false as const,
+          messages: [],
+          nextPageToken: null,
+        };
+      }
+
       const tenant = corsair.withTenant(ctx.session.user.id);
 
       const list = await tenant.gmail.api.messages.list({
@@ -81,6 +110,7 @@ export const gmailRouter = createTRPCRouter({
       );
 
       return {
+        connected: true as const,
         messages,
         nextPageToken: list.nextPageToken ?? null,
       };

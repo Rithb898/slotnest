@@ -224,9 +224,9 @@ export function CommandBar({ children }: { children?: React.ReactNode }) {
               <span>Calendar</span>
               <CommandShortcut>g c</CommandShortcut>
             </CommandItem>
-            <CommandItem onSelect={() => go("/connections")}>
+            <CommandItem onSelect={() => go("/settings")}>
               <Plug />
-              <span>Connections</span>
+              <span>Settings</span>
             </CommandItem>
           </CommandGroup>
           <CommandSeparator />

@@ -9,6 +9,7 @@ import {
   Moon,
   Plug,
   Search,
+  Settings,
   Sun,
   SunMedium,
 } from "lucide-react";
@@ -36,6 +37,7 @@ import {
 } from "@/components/ui/input-group";
 import { Kbd } from "@/components/ui/kbd";
 import { useIsMac } from "@/hooks/use-is-mac";
+import { CALENDAR_POLL_OPTIONS, INBOX_POLL_OPTIONS } from "@/lib/query-options";
 import { cn } from "@/lib/utils";
 import { authClient } from "@/server/auth/client";
 import { api } from "@/trpc/react";
@@ -65,7 +67,7 @@ const PRIMARY: NavItem[] = [
 ];
 
 const SECONDARY: NavItem[] = [
-  { href: "/connections", label: "Connections", icon: Plug },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 // The integrations SlotNest needs to fully function (Corsair plugin keys).
@@ -104,9 +106,16 @@ export function AppSidebar() {
 
   // (1) "Needs you" count + (2) connection health drive the live rail. Both
   // queries share React Query cache keys with /today + /inbox + /connections,
-  // so the sidebar adds no extra fetch on those pages.
-  const inbox = api.gmail.inbox.useQuery({});
+  // so the sidebar adds no extra fetch on those pages. The inbox fetch is gated
+  // on `connections` so a disconnected account never hits the Gmail endpoint.
   const connections = api.connections.list.useQuery();
+  const gmailConnected = connections.data?.includes("gmail") ?? false;
+  const calendarConnected =
+    connections.data?.includes("googlecalendar") ?? false;
+  const inbox = api.gmail.inbox.useQuery(
+    {},
+    { ...INBOX_POLL_OPTIONS, enabled: gmailConnected },
+  );
 
   // (6) Today's events. The range reads the current time, which isn't allowed
   // during prerender (the sidebar sits outside the layout's Suspense boundary),
@@ -123,7 +132,8 @@ export function AppSidebar() {
     setTodayRange({ timeMin: start.toISOString(), timeMax: end.toISOString() });
   }, []);
   const calendar = api.calendar.events.useQuery(todayRange, {
-    enabled: !!todayRange,
+    ...CALENDAR_POLL_OPTIONS,
+    enabled: !!todayRange && calendarConnected,
   });
 
   const needsYou =
@@ -148,13 +158,13 @@ export function AppSidebar() {
     }
     if (href === "/inbox")
       return <CountBadge count={needsYou} urgent={hasUrgent} />;
-    if (href === "/connections" && health) return <StatusDot health={health} />;
+    if (href === "/settings" && health) return <StatusDot health={health} />;
     return null;
   }
 
   // When nothing is connected, the row becomes the call to action itself.
   function labelFor(item: NavItem): string {
-    if (item.href === "/connections" && health === "none") {
+    if (item.href === "/settings" && health === "none") {
       return "Connect accounts";
     }
     return item.label;
@@ -575,9 +585,9 @@ function AccountMenu({
           <>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem onClick={() => router.push("/connections")}>
+              <DropdownMenuItem onClick={() => router.push("/settings")}>
                 <Plug className="size-4" />
-                {health === "none" ? "Connect accounts" : "Connections"}
+                {health === "none" ? "Connect accounts" : "Settings"}
                 {health ? (
                   <span className="ml-auto">
                     <StatusDot health={health} />

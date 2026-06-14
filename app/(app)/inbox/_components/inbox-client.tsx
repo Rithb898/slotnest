@@ -12,6 +12,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { INBOX_POLL_OPTIONS } from "@/lib/query-options";
 import type { TriageAction } from "@/lib/triage";
 import { cn } from "@/lib/utils";
 import { api } from "@/trpc/react";
@@ -27,7 +28,14 @@ const VIEW_FILTER: Record<SmartView, (action: TriageAction) => boolean> = {
 export function InboxClient() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [view, setView] = useState<SmartView>("all");
-  const inbox = api.gmail.inbox.useQuery({});
+  // Gate the inbox fetch on the cheap `connections.list` so a disconnected
+  // account never fires (or polls) the throwing Gmail endpoint.
+  const connections = api.connections.list.useQuery();
+  const gmailConnected = connections.data?.includes("gmail") ?? false;
+  const inbox = api.gmail.inbox.useQuery(
+    {},
+    { ...INBOX_POLL_OPTIONS, enabled: gmailConnected },
+  );
 
   const messages = useMemo(() => {
     if (!inbox.data) return [];

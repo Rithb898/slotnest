@@ -11,9 +11,9 @@ import { getSession } from "@/server/auth/server";
  * Server layout: confirms the user is signed in (better-auth) — the proxy also
  * redirects signed-out users, but this is the real boundary for the shell.
  * Renders the left sidebar + the global ⌘K command bar so the command bar is
- * available on every `(app)` route. Connection guidance toward /connections is
+ * available on every `(app)` route. Connection guidance toward /settings is
  * handled per-page (and by the empty states on /today and /inbox) so the
- * /connections page itself isn't blocked.
+ * /settings page itself isn't blocked.
  *
  * Cache Components: `getSession()` reads `headers()` (runtime data), so the
  * auth gate lives in an async child inside <Suspense>. This lets Next extract

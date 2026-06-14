@@ -3,6 +3,8 @@ import { z } from "zod";
 import { env } from "@/lib/config/env";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { corsair } from "@/server/corsair";
+import { OpenAIAgentsProvider } from "@corsair-dev/mcp";
+import { Agent, run, tool } from "@openai/agents";
 
 /**
  * ⌘K natural-language agent (plan 003 step 6).
@@ -56,14 +58,8 @@ export const agentRouter = createTRPCRouter({
         };
       }
 
-      // Imported lazily so the optional peer deps never load at module init and
-      // the app stays bootable without the agent SDK present.
-      const { OpenAIAgentsProvider } = await import("@corsair-dev/mcp");
-      const { Agent, run, tool } = await import("@openai/agents");
-
       const tenant = corsair.withTenant(ctx.session.user.id);
       const provider = new OpenAIAgentsProvider();
-      // `build()` is documented async; await is safe even if it returns sync.
       const tools = await provider.build({
         corsair: tenant as unknown as Record<string, unknown>,
         tool,
@@ -73,7 +69,7 @@ export const agentRouter = createTRPCRouter({
 
       const agent = new Agent({
         name: "slotnest-agent",
-        model: "gpt-4.1",
+        model: "gpt-4.1-mini",
         instructions: INSTRUCTIONS,
         tools,
       });

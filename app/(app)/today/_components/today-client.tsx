@@ -8,11 +8,14 @@ import {
   Clock3,
   HelpCircle,
   Inbox,
+  Mail,
   MailCheck,
   Send,
+  ShieldCheck,
   Sparkles,
   Sun,
 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
@@ -20,10 +23,11 @@ import { useCommandBar } from "@/components/command-bar";
 import { InviteDialog, type InviteDraft } from "@/components/invite-dialog";
 import { TriageChips } from "@/components/triage-chips";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useIsMac } from "@/hooks/use-is-mac";
+import { CALENDAR_POLL_OPTIONS, INBOX_POLL_OPTIONS } from "@/lib/query-options";
 import { type Triage, triagePriority } from "@/lib/triage";
 import { cn } from "@/lib/utils";
 import { authClient } from "@/server/auth/client";
@@ -235,7 +239,18 @@ export function TodayClient() {
   );
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteDraft, setInviteDraft] = useState<InviteDraft | null>(null);
-  const inbox = api.gmail.inbox.useQuery({});
+  // `connections.list` is the cheap, never-throwing source of truth for what's
+  // connected. The heavy Gmail/Calendar queries are gated on it, so a brand-new
+  // account never fires (or retries) them — the onboarding screen shows at once.
+  const connections = api.connections.list.useQuery();
+  const gmailConnected = connections.data?.includes("gmail") ?? false;
+  const calendarConnected =
+    connections.data?.includes("googlecalendar") ?? false;
+
+  const inbox = api.gmail.inbox.useQuery(
+    {},
+    { ...INBOX_POLL_OPTIONS, enabled: gmailConnected },
+  );
 
   // Today's calendar window (00:00 → 24:00 local) for zone 2.
   const todayRange = useMemo(() => {
@@ -244,11 +259,17 @@ export function TodayClient() {
     const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
     return { timeMin: start.toISOString(), timeMax: end.toISOString() };
   }, []);
-  const calendar = api.calendar.events.useQuery(todayRange);
-  const availability = api.calendar.availability.useQuery({
-    ...todayRange,
-    minMinutes: 30,
+  const calendar = api.calendar.events.useQuery(todayRange, {
+    ...CALENDAR_POLL_OPTIONS,
+    enabled: calendarConnected,
   });
+  const availability = api.calendar.availability.useQuery(
+    {
+      ...todayRange,
+      minMinutes: 30,
+    },
+    { ...CALENDAR_POLL_OPTIONS, enabled: calendarConnected },
+  );
 
   const now = new Date();
   const dateLabel = now.toLocaleDateString(undefined, {
@@ -265,8 +286,6 @@ export function TodayClient() {
       .sort((a, b) => (a.start ?? "").localeCompare(b.start ?? ""))
       .slice(0, 6);
   }, [calendar.data]);
-
-  const calendarConnected = calendar.data?.connected ?? true;
 
   const todaySlots = useMemo(() => {
     if (!availability.data || availability.data.connected === false) return [];
@@ -305,10 +324,14 @@ export function TodayClient() {
   const nextAction = needsReply[0] ?? null;
   const preparedCount = needsReply.length;
   const firstSlot = todaySlots[0] ?? null;
-  const showConnectEmpty =
-    !inbox.isLoading &&
-    !calendar.isLoading &&
-    (inbox.isError || !inbox.data || calendar.data?.connected === false);
+
+  // Once `connections.list` has loaded we can decide the first-run experience
+  // immediately — no need to wait on the gated Gmail/Calendar queries.
+  const connectionsReady = !connections.isPending;
+  const noneConnected =
+    connectionsReady && !gmailConnected && !calendarConnected;
+  const someDisconnected =
+    connectionsReady && (!gmailConnected || !calendarConnected);
 
   function setAction(id: string, state: ActionState) {
     setActionStates((current) => ({ ...current, [id]: state }));
@@ -347,13 +370,15 @@ export function TodayClient() {
               suppressHydrationWarning
             >
               {dateLabel}.{" "}
-              {inbox.isLoading || calendar.isLoading
+              {connections.isPending || inbox.isLoading || calendar.isLoading
                 ? "SlotNest is checking what needs you."
-                : dailySummary({
-                    replies: needsReply.length,
-                    events: todayEvents.length,
-                    openSlots: todaySlots.length,
-                  })}
+                : noneConnected
+                  ? "Connect Gmail and Calendar to begin."
+                  : dailySummary({
+                      replies: needsReply.length,
+                      events: todayEvents.length,
+                      openSlots: todaySlots.length,
+                    })}
             </p>
           </div>
           <HeaderAsk />
@@ -363,143 +388,148 @@ export function TodayClient() {
       {/* Full-screen workspace, constrained like an app canvas instead of a
        * full-width document. The queue stays the primary column; calendar and
        * Ask sit in a stable right rail. */}
-      <div className="mx-auto grid w-full max-w-7xl gap-7 px-5 py-7 sm:px-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-10 lg:px-10 xl:grid-cols-[minmax(720px,1fr)_400px]">
-        {/* Left column — Needs your reply (the primary zone) */}
-        <section className="flex flex-col gap-6">
-          {showConnectEmpty ? (
-            <ConnectFirstState
-              onOpenConnections={() => router.push("/connections")}
+      {noneConnected ? (
+        <OnboardingHero firstName={firstName(session?.user.name)} />
+      ) : (
+        <div className="mx-auto grid w-full max-w-7xl gap-7 px-5 py-7 sm:px-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-10 lg:px-10 xl:grid-cols-[minmax(720px,1fr)_400px]">
+          {/* Left column — Needs your reply (the primary zone) */}
+          <section className="flex flex-col gap-6">
+            {someDisconnected ? (
+              <ConnectFirstState
+                gmailConnected={gmailConnected}
+                calendarConnected={calendarConnected}
+              />
+            ) : null}
+
+            <BriefStrip
+              replies={needsReply.length}
+              prepared={preparedCount}
+              openSlots={todaySlots.length}
             />
-          ) : null}
 
-          <BriefStrip
-            replies={needsReply.length}
-            prepared={preparedCount}
-            openSlots={todaySlots.length}
-          />
+            {nextAction ? (
+              <NextActionCard
+                message={nextAction}
+                slot={firstSlot}
+                state={actionStates[nextAction.id]}
+                onApprove={() => setAction(nextAction.id, "approved")}
+                onEdit={() => router.push("/inbox")}
+                onSkip={() => setAction(nextAction.id, "skipped")}
+                onInvite={() => openInviteFromMessage(nextAction, firstSlot)}
+              />
+            ) : null}
 
-          {nextAction ? (
-            <NextActionCard
-              message={nextAction}
-              slot={firstSlot}
-              state={actionStates[nextAction.id]}
-              onApprove={() => setAction(nextAction.id, "approved")}
-              onEdit={() => router.push("/inbox")}
-              onSkip={() => setAction(nextAction.id, "skipped")}
-              onInvite={() => openInviteFromMessage(nextAction, firstSlot)}
-            />
-          ) : null}
-
-          <div className="flex flex-col gap-3">
-            <SectionHeader icon={Inbox} count={needsReply.length}>
-              Needs your reply
-            </SectionHeader>
-            {inbox.isLoading ? (
-              <ZoneSkeleton />
-            ) : inbox.isError || !inbox.data ? (
-              <EmptyState icon={Inbox}>
-                Couldn&apos;t load your inbox.{" "}
-                <button
-                  type="button"
-                  className="text-[var(--honey-ink)] underline"
-                  onClick={() => router.push("/connections")}
-                >
-                  Is Gmail connected?
-                </button>
-              </EmptyState>
-            ) : needsReply.length === 0 ? (
-              <DoneForNowState />
-            ) : (
-              <ul className="flex flex-col gap-2">
-                {needsReply.map((m) => (
-                  <li key={m.id}>
-                    <ReplyDecisionRow
-                      message={m}
-                      slot={firstSlot}
-                      state={actionStates[m.id]}
-                      onOpen={() => router.push("/inbox")}
-                      onApprove={() => setAction(m.id, "approved")}
-                      onSkip={() => setAction(m.id, "skipped")}
-                      onInvite={() => openInviteFromMessage(m, firstSlot)}
-                    />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          <WaitingOnOthers
-            items={waitingOnOthers}
-            onOpen={() => router.push("/inbox")}
-          />
-        </section>
-
-        {/* Right rail — calendar + the Ask CTA, stacked. */}
-        <div className="flex flex-col gap-7 lg:pt-[3.875rem]">
-          {/* Zone 2 — On your calendar today (lighter, grouped timeline) */}
-          <section className="flex flex-col gap-3">
-            <SectionHeader icon={CalendarDays} count={todayEvents.length}>
-              On your calendar today
-            </SectionHeader>
-            {calendar.isLoading ? (
-              <ZoneSkeleton />
-            ) : calendarConnected === false ? (
-              <EmptyState icon={CalendarDays}>
-                Calendar isn&apos;t connected yet.{" "}
-                <button
-                  type="button"
-                  className="text-[var(--honey-ink)] underline"
-                  onClick={() => router.push("/connections")}
-                >
-                  Connect Google Calendar
-                </button>{" "}
-                to see today&apos;s events and free gaps.
-              </EmptyState>
-            ) : todayEvents.length === 0 ? (
-              <div className="flex flex-col gap-2">
-                <EmptyState icon={Sun}>
-                  Nothing on your calendar today. Clear runway.
+            <div className="flex flex-col gap-3">
+              <SectionHeader icon={Inbox} count={needsReply.length}>
+                Needs your reply
+              </SectionHeader>
+              {connections.isPending || inbox.isLoading ? (
+                <ZoneSkeleton />
+              ) : inbox.isError || !inbox.data ? (
+                <EmptyState icon={Inbox}>
+                  Couldn&apos;t load your inbox.{" "}
+                  <button
+                    type="button"
+                    className="text-[var(--honey-ink)] underline"
+                    onClick={() => router.push("/settings?tab=connections")}
+                  >
+                    Is Gmail connected?
+                  </button>
                 </EmptyState>
-                <OpenSlots
-                  slots={todaySlots}
-                  onOpen={() => router.push("/calendar")}
-                />
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2">
-                <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
-                  {todayEvents.slice(0, 4).map((e) => (
-                    <li key={e.id}>
-                      <button
-                        type="button"
-                        onClick={() => router.push("/calendar")}
-                        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent"
-                      >
-                        <span className="w-16 shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
-                          {e.allDay ? "All day" : fmtTime(e.start)}
-                        </span>
-                        <span className="min-w-0 flex-1 truncate text-[0.9375rem] font-medium">
-                          {e.summary}
-                        </span>
-                      </button>
+              ) : needsReply.length === 0 ? (
+                <DoneForNowState />
+              ) : (
+                <ul className="flex flex-col gap-2">
+                  {needsReply.map((m) => (
+                    <li key={m.id}>
+                      <ReplyDecisionRow
+                        message={m}
+                        slot={firstSlot}
+                        state={actionStates[m.id]}
+                        onOpen={() => router.push("/inbox")}
+                        onApprove={() => setAction(m.id, "approved")}
+                        onSkip={() => setAction(m.id, "skipped")}
+                        onInvite={() => openInviteFromMessage(m, firstSlot)}
+                      />
                     </li>
                   ))}
                 </ul>
-                <OpenSlots
-                  slots={todaySlots}
-                  onOpen={() => router.push("/calendar")}
-                />
-              </div>
-            )}
+              )}
+            </div>
+
+            <WaitingOnOthers
+              items={waitingOnOthers}
+              onOpen={() => router.push("/inbox")}
+            />
           </section>
 
-          {/* Zone 3 — Ask SlotNest (the page's single honey accent) */}
-          <AskSlotNest
-            replies={needsReply.length}
-            openSlots={todaySlots.length}
-          />
+          {/* Right rail — calendar + the Ask CTA, stacked. */}
+          <div className="flex flex-col gap-7 lg:pt-[3.875rem]">
+            {/* Zone 2 — On your calendar today (lighter, grouped timeline) */}
+            <section className="flex flex-col gap-3">
+              <SectionHeader icon={CalendarDays} count={todayEvents.length}>
+                On your calendar today
+              </SectionHeader>
+              {connections.isPending || calendar.isLoading ? (
+                <ZoneSkeleton />
+              ) : calendarConnected === false ? (
+                <EmptyState icon={CalendarDays}>
+                  Calendar isn&apos;t connected yet.{" "}
+                  <button
+                    type="button"
+                    className="text-[var(--honey-ink)] underline"
+                    onClick={() => router.push("/settings?tab=connections")}
+                  >
+                    Connect Google Calendar
+                  </button>{" "}
+                  to see today&apos;s events and free gaps.
+                </EmptyState>
+              ) : todayEvents.length === 0 ? (
+                <div className="flex flex-col gap-2">
+                  <EmptyState icon={Sun}>
+                    Nothing on your calendar today. Clear runway.
+                  </EmptyState>
+                  <OpenSlots
+                    slots={todaySlots}
+                    onOpen={() => router.push("/calendar")}
+                  />
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
+                    {todayEvents.slice(0, 4).map((e) => (
+                      <li key={e.id}>
+                        <button
+                          type="button"
+                          onClick={() => router.push("/calendar")}
+                          className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent"
+                        >
+                          <span className="w-16 shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
+                            {e.allDay ? "All day" : fmtTime(e.start)}
+                          </span>
+                          <span className="min-w-0 flex-1 truncate text-[0.9375rem] font-medium">
+                            {e.summary}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <OpenSlots
+                    slots={todaySlots}
+                    onOpen={() => router.push("/calendar")}
+                  />
+                </div>
+              )}
+            </section>
+
+            {/* Zone 3 — Ask SlotNest (the page's single honey accent) */}
+            <AskSlotNest
+              replies={needsReply.length}
+              openSlots={todaySlots.length}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       <InviteDialog
         open={inviteOpen}
@@ -552,39 +582,186 @@ function BriefItem({
   );
 }
 
+const PROVIDER_CONNECT = {
+  gmail: { label: "Gmail", icon: Mail },
+  googlecalendar: { label: "Google Calendar", icon: CalendarDays },
+} as const;
+
+/**
+ * Inline banner for the PARTIAL case — one of Gmail/Calendar is connected and
+ * the other isn't. Sits above the queue and links straight to OAuth for the
+ * missing side (no detour through /settings).
+ */
 function ConnectFirstState({
-  onOpenConnections,
+  gmailConnected,
+  calendarConnected,
 }: {
-  onOpenConnections: () => void;
+  gmailConnected: boolean;
+  calendarConnected: boolean;
 }) {
+  const missing = (
+    [
+      !gmailConnected ? ("gmail" as const) : null,
+      !calendarConnected ? ("googlecalendar" as const) : null,
+    ].filter(Boolean) as (keyof typeof PROVIDER_CONNECT)[]
+  ).map((key) => ({ key, ...PROVIDER_CONNECT[key] }));
+
+  if (missing.length === 0) return null;
+  const which = missing.map((m) => m.label).join(" and ");
+
   return (
-    <section className="rounded-xl border border-primary/30 bg-primary/5 p-5">
-      <div className="flex items-start gap-3">
-        <Sparkles className="mt-0.5 size-5 shrink-0 text-[var(--honey-ink)]" />
+    <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-[var(--honey-ink)]">
+          <Sparkles className="size-5" />
+        </span>
         <div className="min-w-0 flex-1">
           <h2 className="text-base font-semibold">
-            Connect Gmail and Calendar to unlock Today
+            Connect {which} to see everything
           </h2>
           <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-            SlotNest needs both sides of your work: Gmail for what needs a
-            reply, and Calendar for the open time that can solve scheduling.
+            SlotNest works best with both sides of your day — what needs a reply
+            and the open time that can solve scheduling.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
-            <Button type="button" size="sm" onClick={onOpenConnections}>
-              Connect Gmail
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={onOpenConnections}
-            >
-              Connect Calendar
-            </Button>
+            {missing.map((m) => {
+              const Icon = m.icon;
+              return (
+                <Link
+                  key={m.key}
+                  href={`/api/corsair/connect?plugin=${m.key}`}
+                  className={cn(buttonVariants({ size: "sm" }))}
+                >
+                  <Icon className="size-3.5" />
+                  Connect {m.label}
+                </Link>
+              );
+            })}
           </div>
         </div>
       </div>
     </section>
+  );
+}
+
+/**
+ * First-run hero shown when NOTHING is connected — replaces the empty queue so a
+ * brand-new account lands on a clear, inviting next step instead of blank zones.
+ */
+function OnboardingHero({ firstName }: { firstName: string }) {
+  return (
+    <div className="mx-auto flex w-full max-w-3xl flex-col px-5 py-8 sm:px-6 lg:px-10">
+      <section className="rounded-xl border border-border bg-card p-5 sm:p-6">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+          <div className="max-w-xl">
+            <span className="inline-flex size-10 items-center justify-center rounded-lg bg-primary/10 text-[var(--honey-ink)]">
+              <Sparkles className="size-5" />
+            </span>
+            <h2 className="mt-4 text-xl font-semibold tracking-tight sm:text-2xl">
+              Welcome to SlotNest, {firstName}
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Type what you want done. SlotNest finds the calendar slot, drafts
+              the email, and waits for your approval before anything is sent.
+            </p>
+          </div>
+
+          {/* One click -> Gmail OAuth, then straight into Calendar OAuth. */}
+          <Link
+            href="/api/corsair/connect?plugin=gmail&next=googlecalendar"
+            className={cn(
+              buttonVariants({ size: "lg" }),
+              "w-full shrink-0 sm:w-auto",
+            )}
+          >
+            <Sparkles className="size-4" />
+            Connect Google
+          </Link>
+        </div>
+
+        <div className="mt-6 overflow-hidden rounded-xl border border-border bg-background">
+          <div className="border-b border-border bg-muted px-4 py-3">
+            <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-left">
+              <Sparkles className="size-4 shrink-0 text-[var(--honey-ink)]" />
+              <p className="min-w-0 flex-1 text-sm text-foreground">
+                Send a calendar invite to Sam at 9 AM Thursday and email him
+                that I&apos;m looking forward to our meeting.
+              </p>
+              <Kbd className="hidden sm:inline-flex">↵</Kbd>
+            </div>
+          </div>
+
+          <div className="divide-y divide-border">
+            <CommandPreviewStep
+              icon={CalendarDays}
+              title="Finds real free time"
+              description="Checks Google Calendar and prepares the meeting slot."
+            />
+            <CommandPreviewStep
+              icon={MailCheck}
+              title="Writes the email"
+              description="Drafts the note in plain language, ready to send."
+            />
+            <CommandPreviewStep
+              icon={CheckCircle2}
+              title="Waits for approval"
+              description="Nothing books or sends until you confirm."
+            />
+          </div>
+        </div>
+
+        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1">
+              <Mail className="size-3.5" />
+              Gmail
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1">
+              <CalendarDays className="size-3.5" />
+              Google Calendar
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1">
+              <ShieldCheck className="size-3.5" />
+              Approve before send
+            </span>
+          </div>
+
+          <Link
+            href="/settings?tab=connections"
+            className={cn(
+              buttonVariants({ variant: "ghost", size: "sm" }),
+              "self-start text-muted-foreground sm:self-auto",
+            )}
+          >
+            Manage connections
+          </Link>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function CommandPreviewStep({
+  icon: Icon,
+  title,
+  description,
+}: {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex items-start gap-3 px-4 py-3.5">
+      <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+        <Icon className="size-4" />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold">{title}</span>
+        <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">
+          {description}
+        </span>
+      </span>
+    </div>
   );
 }
 

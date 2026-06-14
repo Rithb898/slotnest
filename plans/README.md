@@ -12,14 +12,49 @@ honor its STOP conditions, and update your row when done.
 | 002  | Gmail inbox — read threads/messages via Corsair, two-pane reading UI | P1 | M | 001 | DONE (code complete, typechecks + lint clean; `gmail` tRPC router (`inbox`/`message`) + `/inbox` two-pane UI. Runtime smoke test pending). Also mounted `TRPCReactProvider` (was missing) to enable client tRPC hooks. |
 | 003  | Dashboard design — the "approve, don't read" command center (app shell, /today, /inbox upgrades, /calendar, ⌘K agent) | P1 | L | 001, 002 | DONE (all 6 steps) — APPROVED on review in worktree `agent-a6ad3387ad85cc481` (branch `worktree-agent-a6ad3387ad85cc481`), **3 commits, NOT merged/pushed — merge is the user's call**. Gates: `tsc --noEmit` exit 0, biome clean on all 18 touched files. `pnpm build` NOT run (per user). Built: app shell + sidebar + ⌘K command bar (`b46af33`); `/calendar` + free-slot finder + send-invite + `/today` zone-2 + inbox `→ Invite`, all real Corsair Calendar data, tenant-scoped (`abaa32d`); ⌘K NL agent via OpenAI Agents SDK + Corsair MCP, `OPENAI_API_KEY` optional + graceful degrade (`ba9ed9f`). **CAVEAT (product decision pending):** the agent is gated READ-ONLY by *system-prompt instruction only* — the MCP `run_script` tool can call writes and the provider exposes no per-tool approval hook, so draft-then-approve is NOT structurally enforced. Consequence: the plan's hero demo (one sentence → book invite + send email) is NOT performed; agent proposes, user executes via approve-first UI. To get the hero flow safely, add a confirm-then-execute path (agent proposes → user ↵ → deterministic write via `calendar`/`gmail` routers). Also: `getAvailability` response shape assumed = Google freebusy (`calendars[id].busy[]`), beyond the doc's opaque type. |
 
+| 004  | Gmail reply path — send a threaded reply (the loop's missing arm) | P0 | M | 002, 003 | TODO |
+| 005  | LLM Draft reply — the real "Draft reply" (on-demand) | P1 | M | 004 | TODO |
+| 006  | Webhook ingest → fast local reads (the "Local cache") | P0 | M–L | 001 | TODO (**owned by user to implement**) |
+| 007  | LLM triage on ingest — real two-axis classification | P1 | M | 006 | TODO |
+| 008  | Hybrid search — pgvector semantic + Postgres keyword | P1 | L | 006 | TODO |
+| 009  | Agent propose → approve → execute (hero "one sentence" flow) | P2 | M | 004 | TODO |
+| 010  | AI-native daily workspace and retention loop | P0 | L | 003, 004, 005, 009 | TODO |
+
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
+
+## Plans 004–009 — provenance & sequencing
+
+Added 2026-06-14 from a grill-with-docs session. Objective chosen: **shippable
+product — make the real loop (triage → draft → approve → send) work, correctness
+over coverage.** Two recommended tracks:
+
+- **Critical path (the loop): 004 → 005.** 004 closes the missing *send* half of
+  the loop (the calendar half already works via `invite-dialog` →
+  `calendar.createEvent`); 005 adds the AI draft on top. Ship + verify on a real
+  account after 004 — that's the shippable milestone.
+- **Foundation track: 006 → {007, 008}.** 006 (webhooks → local cache) is
+  **owned by the user** and unlocks the PRD's P1 intelligence: 007 (LLM triage on
+  ingest) and 008 (hybrid search) both run off 006's `webhookHooks.after` ingest
+  seam and persist, never on the read path.
+- **009** (agent hero flow) is P2: it reuses 004's deterministic writes and is the
+  demo climax, not a dependency of the loop.
+- **010** is the confirmed product direction: make `/today` the AI-native daily
+  workspace, then add `/drafts` and `/waiting` as recurring workflow pages.
+
+Suggested order: 004, then 006 (user, in parallel), then 005, 007, 008, 009.
 
 ## Dependency notes
 
-- 001 is the foundation for all Gmail/Calendar features. The (not-yet-written)
-  inbox-read and calendar-read plans will depend on 001 because they call
-  `corsair.withTenant(userId).<plugin>.api.*`, which only returns data once an
-  account is connected by 001's flow.
+- 001 is the foundation for all Gmail/Calendar features (every plan calls
+  `corsair.withTenant(userId).<plugin>.*`).
+- 004 depends on 002/003 (read + shell) and is the prerequisite for 005 and 009.
+- 006 is the foundation for 007 and 008 (both need the ingest hook + cache). 006
+  has a **documented gap**: Gmail `users.watch` / Calendar `events.watch`
+  subscription registration is **not** in `docs/corsair/` — resolve that doc
+  before wiring providers (see plan 006 STOP conditions).
+- Corsair already maintains `corsair_entities` + `*.db.*` (DB is wired in
+  `server/corsair.ts`); 006 is mostly "turn on webhooks + switch reads to
+  `.db.*`", not a sync layer from scratch.
 
 ## Findings considered and rejected
 
