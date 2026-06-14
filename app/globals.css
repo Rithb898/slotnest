@@ -175,93 +175,130 @@
     font-family: var(--font-serif), Georgia, "Times New Roman", serif;
   }
 
-/* Honey glow blobs — soft drifting light, not glassmorphism */
-@keyframes drift-a {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-  50% { transform: translate3d(2rem, -1.5rem, 0) scale(1.08); }
-}
-@keyframes drift-b {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(1.05); }
-  50% { transform: translate3d(-1.75rem, 1.25rem, 0) scale(0.96); }
-}
-@keyframes caret-blink {
-  0%, 49% { opacity: 1; }
-  50%, 100% { opacity: 0; }
-}
-@keyframes marquee-track {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
-}
-@keyframes sheen {
-  from { transform: translateX(-120%); }
-  to { transform: translateX(220%); }
-}
-.blob {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(36px);
-  pointer-events: none;
-  will-change: transform;
-}
-.blob--a { animation: drift-a 16s ease-in-out infinite; }
-.blob--b { animation: drift-b 19s ease-in-out infinite; }
+  /* Honey glow blobs — soft drifting light, not glassmorphism */
+  @keyframes drift-a {
+    0%,
+    100% {
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+    50% {
+      transform: translate3d(2rem, -1.5rem, 0) scale(1.08);
+    }
+  }
+  @keyframes drift-b {
+    0%,
+    100% {
+      transform: translate3d(0, 0, 0) scale(1.05);
+    }
+    50% {
+      transform: translate3d(-1.75rem, 1.25rem, 0) scale(0.96);
+    }
+  }
+  @keyframes caret-blink {
+    0%,
+    49% {
+      opacity: 1;
+    }
+    50%,
+    100% {
+      opacity: 0;
+    }
+  }
+  @keyframes marquee-track {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  @keyframes sheen {
+    from {
+      transform: translateX(-120%);
+    }
+    to {
+      transform: translateX(220%);
+    }
+  }
+  .blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(36px);
+    pointer-events: none;
+    will-change: transform;
+  }
+  .blob--a {
+    animation: drift-a 16s ease-in-out infinite;
+  }
+  .blob--b {
+    animation: drift-b 19s ease-in-out infinite;
+  }
 
-.caret { animation: caret-blink 1.05s step-end infinite; }
+  .caret {
+    animation: caret-blink 1.05s step-end infinite;
+  }
 
-.marquee-track {
-  display: flex;
-  width: max-content;
-  animation: marquee-track 38s linear infinite;
-}
+  .marquee-track {
+    display: flex;
+    width: max-content;
+    animation: marquee-track 38s linear infinite;
+  }
 
-.sheen-host { position: relative; overflow: hidden; }
-.sheen-host::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    105deg,
-    transparent 35%,
-    color-mix(in oklch, var(--primary) 22%, transparent) 50%,
-    transparent 65%
-  );
-  transform: translateX(-120%);
-  pointer-events: none;
-}
-.sheen-host:hover::after { animation: sheen 0.9s ease-out; }
-
-/* Scroll reveal — content is visible by default; JS arms the hide only
-   when reveal is supported, so headless / no-JS renders never ship blank. */
-[data-reveal] {
-  transition:
-    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
-    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1),
-    filter 0.7s cubic-bezier(0.22, 1, 0.36, 1);
-}
-[data-reveal="armed"] {
-  opacity: 0;
-  transform: translateY(1.5rem);
-  filter: blur(6px);
-}
-[data-reveal="shown"] {
-  opacity: 1;
-  transform: none;
-  filter: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .blob--a,
-  .blob--b,
-  .caret,
-  .marquee-track,
+  .sheen-host {
+    position: relative;
+    overflow: hidden;
+  }
+  .sheen-host::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      105deg,
+      transparent 35%,
+      color-mix(in oklch, var(--primary) 22%, transparent) 50%,
+      transparent 65%
+    );
+    transform: translateX(-120%);
+    pointer-events: none;
+  }
   .sheen-host:hover::after {
-    animation: none !important;
+    animation: sheen 0.9s ease-out;
+  }
+
+  /* Scroll reveal — content is visible by default; JS arms the hide only
+   when reveal is supported, so headless / no-JS renders never ship blank. */
+  [data-reveal] {
+    transition:
+      opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+      filter 0.7s cubic-bezier(0.22, 1, 0.36, 1);
   }
   [data-reveal="armed"] {
+    opacity: 0;
+    transform: translateY(1.5rem);
+    filter: blur(6px);
+  }
+  [data-reveal="shown"] {
     opacity: 1;
     transform: none;
     filter: none;
   }
-  html { scroll-behavior: auto; }
-}
+
+  @media (prefers-reduced-motion: reduce) {
+    .blob--a,
+    .blob--b,
+    .caret,
+    .marquee-track,
+    .sheen-host:hover::after {
+      animation: none !important;
+    }
+    [data-reveal="armed"] {
+      opacity: 1;
+      transform: none;
+      filter: none;
+    }
+    html {
+      scroll-behavior: auto;
+    }
+  }
 }

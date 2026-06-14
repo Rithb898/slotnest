@@ -111,21 +111,59 @@
       }
     },
     "typographyMeta": {
-      "display": { "displayName": "Display", "purpose": "Page titles; largest element on a screen." },
-      "headline": { "displayName": "Headline", "purpose": "Section headers and dialog titles." },
-      "title": { "displayName": "Title", "purpose": "Email subjects, event titles, button labels, the active row." },
-      "body": { "displayName": "Body", "purpose": "Default UI text, email previews, descriptions." },
-      "label": { "displayName": "Label", "purpose": "Chips, metadata, captions; sentence case." },
-      "mono": { "displayName": "Mono", "purpose": "Shortcut chips, timestamps, counts, addresses only." }
+      "display": {
+        "displayName": "Display",
+        "purpose": "Page titles; largest element on a screen."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Section headers and dialog titles."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Email subjects, event titles, button labels, the active row."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Default UI text, email previews, descriptions."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Chips, metadata, captions; sentence case."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Shortcut chips, timestamps, counts, addresses only."
+      }
     },
     "shadows": [
-      { "name": "lift", "value": "0 1px 2px rgba(0,0,0,0.04), 0 2px 8px rgba(0,0,0,0.06)", "purpose": "Hovered rows and resting popovers/dropdowns. Barely there." },
-      { "name": "float", "value": "0 8px 32px rgba(0,0,0,0.12)", "purpose": "Command bar and modal dialogs — the one surface allowed to clearly float." }
+      {
+        "name": "lift",
+        "value": "0 1px 2px rgba(0,0,0,0.04), 0 2px 8px rgba(0,0,0,0.06)",
+        "purpose": "Hovered rows and resting popovers/dropdowns. Barely there."
+      },
+      {
+        "name": "float",
+        "value": "0 8px 32px rgba(0,0,0,0.12)",
+        "purpose": "Command bar and modal dialogs — the one surface allowed to clearly float."
+      }
     ],
     "motion": [
-      { "name": "ease-out-quart", "value": "cubic-bezier(0.25, 1, 0.5, 1)", "purpose": "Default easing for state transitions and reveals." },
-      { "name": "duration-fast", "value": "150ms", "purpose": "Hover, focus, button, and input state changes." },
-      { "name": "duration-base", "value": "200ms", "purpose": "Dropdown/command-bar open, row selection." }
+      {
+        "name": "ease-out-quart",
+        "value": "cubic-bezier(0.25, 1, 0.5, 1)",
+        "purpose": "Default easing for state transitions and reveals."
+      },
+      {
+        "name": "duration-fast",
+        "value": "150ms",
+        "purpose": "Hover, focus, button, and input state changes."
+      },
+      {
+        "name": "duration-base",
+        "value": "200ms",
+        "purpose": "Dropdown/command-bar open, row selection."
+      }
     ],
     "breakpoints": [
       { "name": "sm", "value": "640px" },
@@ -204,11 +242,31 @@
       "AA contrast everywhere, visible focus rings, full keyboard navigation as a first-class concern."
     ],
     "rules": [
-      { "name": "The One Light Rule", "body": "Honey appears on ≤10% of any screen and means exactly one thing: this is what to act on. If two honey elements compete, one is wrong. Triage urgency uses the semantic trio, never honey.", "section": "colors" },
-      { "name": "The Warmth-In-The-Light Rule", "body": "Warmth lives in the accent and the type, never in the background. The body surface is pure #ffffff. Tinting toward cream/sand is forbidden.", "section": "colors" },
-      { "name": "The No-Eyebrow Rule", "body": "No tiny uppercase tracked kickers above sections. Labels are sentence case at normal tracking.", "section": "typography" },
-      { "name": "The Fixed-Scale Rule", "body": "Type sizes are fixed rem, never clamp(). A heading that shrinks inside a sidebar panel looks worse, not better.", "section": "typography" },
-      { "name": "The Flat-At-Rest Rule", "body": "Surfaces are flat until the user touches them. If a card has a shadow before you hover it, the shadow is wrong. Depth is feedback, not styling.", "section": "elevation" }
+      {
+        "name": "The One Light Rule",
+        "body": "Honey appears on ≤10% of any screen and means exactly one thing: this is what to act on. If two honey elements compete, one is wrong. Triage urgency uses the semantic trio, never honey.",
+        "section": "colors"
+      },
+      {
+        "name": "The Warmth-In-The-Light Rule",
+        "body": "Warmth lives in the accent and the type, never in the background. The body surface is pure #ffffff. Tinting toward cream/sand is forbidden.",
+        "section": "colors"
+      },
+      {
+        "name": "The No-Eyebrow Rule",
+        "body": "No tiny uppercase tracked kickers above sections. Labels are sentence case at normal tracking.",
+        "section": "typography"
+      },
+      {
+        "name": "The Fixed-Scale Rule",
+        "body": "Type sizes are fixed rem, never clamp(). A heading that shrinks inside a sidebar panel looks worse, not better.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-At-Rest Rule",
+        "body": "Surfaces are flat until the user touches them. If a card has a shadow before you hover it, the shadow is wrong. Depth is feedback, not styling.",
+        "section": "elevation"
+      }
     ],
     "dos": [
       "Do keep the body background pure white (#ffffff). Carry all warmth in the honey accent and Geist type.",

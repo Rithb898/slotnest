@@ -125,9 +125,19 @@ export function BentoGrid() {
             <CardHead title="Insights history" />
             <div className="mt-3 space-y-1.5">
               {[
-                { d: "Mon", l: "Triage accuracy", v: "94%", t: "good" as const },
+                {
+                  d: "Mon",
+                  l: "Triage accuracy",
+                  v: "94%",
+                  t: "good" as const,
+                },
                 { d: "Tue", l: "Reply latency", v: "1.2h", t: "good" as const },
-                { d: "Wed", l: "Backlog cleared", v: "61%", t: "attn" as const },
+                {
+                  d: "Wed",
+                  l: "Backlog cleared",
+                  v: "61%",
+                  t: "attn" as const,
+                },
                 { d: "Thu", l: "Meetings booked", v: "12", t: "good" as const },
               ].map((r) => (
                 <div
@@ -193,7 +203,9 @@ function Card({
 function CardHead({ title }: { title: string }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-[0.8rem] font-semibold text-[#2c2c2c]">{title}</span>
+      <span className="text-[0.8rem] font-semibold text-[#2c2c2c]">
+        {title}
+      </span>
       <TrendingUp className="size-3.5 text-muted-foreground" />
     </div>
   );
@@ -262,7 +274,10 @@ function Gauge({ value, max }: { value: number; max: number }) {
   const circ = 2 * Math.PI * radius;
   return (
     <div className="relative grid size-32 place-items-center">
-      <svg className="absolute inset-0 size-full -rotate-90" viewBox="0 0 110 110">
+      <svg
+        className="absolute inset-0 size-full -rotate-90"
+        viewBox="0 0 110 110"
+      >
         <title>Inbox health gauge</title>
         <circle
           cx="55"

@@ -18,7 +18,10 @@ export function SiteFooter() {
     <footer className="relative overflow-hidden bg-[#0e0e0e] text-white">
       {/* Top nav row */}
       <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-5 px-5 py-7 sm:flex-row sm:px-8">
-        <a href="/" className="flex items-center gap-2.5 font-bold tracking-tight">
+        <a
+          href="/"
+          className="flex items-center gap-2.5 font-bold tracking-tight"
+        >
           <svg
             className="size-6 shrink-0 text-white"
             viewBox="0 0 24 24"
