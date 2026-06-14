@@ -52,6 +52,13 @@ type CommandBarContextValue = {
   toggle: () => void;
 };
 
+/** `g`-prefixed jump targets — mirrors the hints shown in the bar + sidebar. */
+const GOTO: Record<string, Route> = {
+  t: "/today",
+  i: "/inbox",
+  c: "/calendar",
+};
+
 const CommandBarContext = createContext<CommandBarContextValue | null>(null);
 
 /** Imperative handle so other surfaces (e.g. /today "Ask SlotNest") can open ⌘K. */
@@ -76,16 +83,46 @@ export function CommandBar({ children }: { children?: React.ReactNode }) {
 
   const toggle = useCallback(() => setOpen((o) => !o), []);
 
+  // Global shortcuts: ⌘K opens the bar; `g` then t/i/c jumps to a surface
+  // (the chord the command bar advertises). Discoverable, never required —
+  // and skipped while typing in any field.
   useEffect(() => {
+    let gPressedAt = 0;
+    function isEditable(el: EventTarget | null): boolean {
+      if (!(el instanceof HTMLElement)) return false;
+      const tag = el.tagName;
+      return (
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        tag === "SELECT" ||
+        el.isContentEditable
+      );
+    }
     function onKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         toggle();
+        return;
       }
+      if (e.metaKey || e.ctrlKey || e.altKey || isEditable(e.target)) return;
+
+      const key = e.key.toLowerCase();
+      if (key === "g") {
+        gPressedAt = Date.now();
+        return;
+      }
+      if (gPressedAt && Date.now() - gPressedAt < 1200 && key in GOTO) {
+        e.preventDefault();
+        gPressedAt = 0;
+        setOpen(false);
+        router.push(GOTO[key]);
+        return;
+      }
+      gPressedAt = 0;
     }
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [toggle]);
+  }, [toggle, router]);
 
   // Reset transient state whenever the bar closes.
   useEffect(() => {
