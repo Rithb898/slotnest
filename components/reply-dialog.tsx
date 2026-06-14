@@ -104,6 +104,7 @@ export function ReplyDialog({
       subject: draft.subject,
       body: body.trim(),
       threadId: draft.threadId,
+      messageId: draft.messageId,
       inReplyTo: draft.inReplyTo ?? undefined,
       references: draft.references ?? undefined,
     });

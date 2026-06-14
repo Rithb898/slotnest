@@ -2,6 +2,7 @@
 
 import {
   CalendarDays,
+  CalendarPlus,
   CheckCircle2,
   Clock3,
   HelpCircle,
@@ -9,6 +10,7 @@ import {
   Mail,
   MailCheck,
   PenLine,
+  RefreshCw,
   Send,
   ShieldCheck,
   Sparkles,
@@ -16,7 +18,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useCommandBar } from "@/components/command-bar";
 import { InviteDialog, type InviteDraft } from "@/components/invite-dialog";
@@ -84,6 +86,9 @@ export function TodayClient() {
   const [replyOpen, setReplyOpen] = useState(false);
   const [inviteDraft, setInviteDraft] = useState<InviteDraft | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
+  // AI-drafted reply bodies, keyed by message id. Cached so re-selecting a row
+  // doesn't re-bill the model. "" means drafted-but-empty / unavailable.
+  const [aiDrafts, setAiDrafts] = useState<Record<string, string>>({});
 
   const connections = api.connections.list.useQuery();
   const gmailConnected = connections.data?.includes("gmail") ?? false;
@@ -159,6 +164,65 @@ export function TodayClient() {
   const nextEvent = todayEvents[0] ?? null;
   const now = new Date();
 
+  // Pre-draft the reply for the selected message with AI ("approve, don't
+  // read"). Read-only: this only fills the body the user later approves to send.
+  // A ref tracks which ids we've already requested so reselecting a row never
+  // re-bills the model.
+  const draftReply = api.gmail.draftReply.useMutation();
+  const requestedDrafts = useRef<Set<string>>(new Set());
+  const draftFor = draftReply.mutateAsync;
+  const selectedDraftId = selected?.id ?? null;
+  useEffect(() => {
+    const id = selectedDraftId;
+    if (!id || !gmailConnected || requestedDrafts.current.has(id)) return;
+    requestedDrafts.current.add(id);
+    let cancelled = false;
+    draftFor({ messageId: id })
+      .then((res) => {
+        if (cancelled) return;
+        setAiDrafts((current) => ({
+          ...current,
+          [id]: res.configured ? res.text.trim() : "",
+        }));
+      })
+      .catch(() => {
+        // Cache empty so the panel falls back to the generic preview instead
+        // of spinning forever.
+        if (!cancelled) {
+          setAiDrafts((current) => ({ ...current, [id]: "" }));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDraftId, gmailConnected, draftFor]);
+
+  const selectedDraft = selected ? aiDrafts[selected.id] : undefined;
+  const selectedDraftLoading = Boolean(
+    selected && gmailConnected && !(selected.id in aiDrafts),
+  );
+
+  // Force a fresh AI draft, overwriting the stored one (force: true on the
+  // server). Drop the cached body first so the panel shows its loading state.
+  function regenerateDraft(id: string) {
+    requestedDrafts.current.add(id);
+    setAiDrafts((current) => {
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+    draftFor({ messageId: id, force: true })
+      .then((res) => {
+        setAiDrafts((current) => ({
+          ...current,
+          [id]: res.configured ? res.text.trim() : "",
+        }));
+      })
+      .catch(() => {
+        setAiDrafts((current) => ({ ...current, [id]: "" }));
+      });
+  }
+
   const briefInput = useMemo(
     () => ({
       needsReply: queue.length,
@@ -221,6 +285,20 @@ export function TodayClient() {
     setReplyOpen(true);
   }
 
+  // "Schedule" from the header: an empty invite draft prefilled with the best
+  // open slot. The user types the attendee email + adjusts the time, then
+  // approves — nothing books without the explicit "Send invite" in the dialog.
+  function openScheduler() {
+    setInviteDraft({
+      summary: "",
+      start: bestSlot?.start,
+      end: bestSlot?.end,
+      attendees: [],
+      description: "",
+    });
+    setInviteOpen(true);
+  }
+
   function openInvite(message: WorkspaceMessage, slot?: WorkspaceSlot | null) {
     setInviteDraft({
       summary: cleanReplySubject(message.subject, "Meeting"),
@@ -250,14 +328,20 @@ export function TodayClient() {
               })}
             </p>
           </div>
-          <HeaderAsk />
+          <div className="flex shrink-0 items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={openScheduler}>
+              <CalendarPlus className="size-4" />
+              <span className="hidden sm:inline">Schedule</span>
+            </Button>
+            <HeaderAsk />
+          </div>
         </div>
       </header>
 
       {noneConnected ? (
         <OnboardingHero firstName={firstName(session?.user.name)} />
       ) : (
-        <div className="mx-auto grid w-full max-w-7xl gap-5 px-5 py-5 sm:px-6 lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)_300px] lg:px-8">
+        <div className="mx-auto grid w-full max-w-7xl gap-4 px-5 py-4 sm:px-6 lg:grid-cols-[minmax(260px,340px)_minmax(0,1fr)_300px] lg:px-8">
           <section className="lg:col-span-3">
             {someDisconnected ? (
               <ConnectFirstState
@@ -312,14 +396,17 @@ export function TodayClient() {
             )}
           </section>
 
-          <section className="min-h-[520px] rounded-xl border border-border bg-card">
+          <section className="min-h-[440px] rounded-xl border border-border bg-card">
             {selected ? (
               <DecisionPanel
                 message={selected}
                 slot={bestSlot}
                 state={actionStates[selected.id]}
-                onApprove={() => openReply(selected)}
-                onEdit={() => openReply(selected)}
+                draftBody={selectedDraft}
+                draftLoading={selectedDraftLoading}
+                onRegenerate={() => regenerateDraft(selected.id)}
+                onApprove={() => openReply(selected, selectedDraft ?? "")}
+                onEdit={() => openReply(selected, selectedDraft ?? "")}
                 onSkip={() => setAction(selected.id, "skipped")}
                 onSnooze={() => setAction(selected.id, "snoozed")}
                 onInvite={() => openInvite(selected, bestSlot)}
@@ -380,39 +467,45 @@ function DailyBrief({
 }) {
   return (
     <div className="rounded-xl border border-border bg-card px-4 py-4 sm:px-5">
-      <div className="flex items-start gap-3">
-        <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-[var(--honey-ink)]">
-          <Sparkles className="size-4" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="mb-1 flex items-center gap-2 text-sm font-semibold">
-            AI daily brief
-            {loading ? (
-              <span className="text-xs font-normal text-muted-foreground">
-                updating
-              </span>
-            ) : null}
-          </div>
-          {loading ? (
-            <Skeleton className="h-5 max-w-3xl" />
-          ) : (
-            <p className="max-w-4xl text-[0.9375rem] leading-6 text-foreground">
-              {text}
-            </p>
-          )}
-          {highlights.length > 0 ? (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {highlights.map((highlight) => (
-                <span
-                  key={highlight}
-                  className="rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground"
-                >
-                  {highlight}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-8">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-[var(--honey-ink)]">
+            <Sparkles className="size-4" />
+          </span>
+          <div className="min-w-0">
+            <div className="mb-1 flex items-center gap-2 text-sm font-semibold">
+              AI daily brief
+              {loading ? (
+                <span className="text-xs font-normal text-muted-foreground">
+                  updating
                 </span>
-              ))}
+              ) : null}
             </div>
-          ) : null}
+            {loading ? (
+              <Skeleton className="h-5 max-w-2xl" />
+            ) : (
+              <p className="text-[0.9375rem] leading-6 text-foreground">
+                {text}
+              </p>
+            )}
+          </div>
         </div>
+        {highlights.length > 0 ? (
+          <ul className="flex flex-col gap-1.5 lg:w-72 lg:shrink-0 lg:border-l lg:border-border lg:pl-6">
+            {highlights.map((highlight) => (
+              <li
+                key={highlight}
+                className="flex items-center gap-2 text-xs font-medium text-muted-foreground"
+              >
+                <span
+                  className="size-1.5 shrink-0 rounded-full bg-primary/50"
+                  aria-hidden
+                />
+                {highlight}
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </div>
     </div>
   );
@@ -479,6 +572,9 @@ function DecisionPanel({
   message,
   slot,
   state,
+  draftBody,
+  draftLoading,
+  onRegenerate,
   onApprove,
   onEdit,
   onSkip,
@@ -489,6 +585,9 @@ function DecisionPanel({
   message: WorkspaceMessage;
   slot: WorkspaceSlot | null;
   state?: ActionState;
+  draftBody?: string;
+  draftLoading?: boolean;
+  onRegenerate: () => void;
   onApprove: () => void;
   onEdit: () => void;
   onSkip: () => void;
@@ -527,10 +626,38 @@ function DecisionPanel({
         </section>
 
         <section>
-          <SectionTitle icon={PenLine}>Prepared reply</SectionTitle>
-          <div className="mt-2 rounded-lg border border-border bg-background px-3 py-3 text-sm leading-6">
-            {draftPreview(message)}
+          <div className="flex items-center justify-between gap-2">
+            <SectionTitle icon={PenLine}>Prepared reply</SectionTitle>
+            <div className="flex items-center gap-1">
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                <Sparkles className="size-3 text-[var(--honey-ink)]" />
+                {draftLoading ? "Drafting…" : "AI draft"}
+              </span>
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={onRegenerate}
+                disabled={draftLoading}
+                aria-label="Regenerate draft"
+              >
+                <RefreshCw
+                  className={cn("size-3.5", draftLoading && "animate-spin")}
+                />
+                Regenerate
+              </Button>
+            </div>
           </div>
+          {draftLoading ? (
+            <div className="mt-2 space-y-2 rounded-lg border border-border bg-background px-3 py-3">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-11/12" />
+              <Skeleton className="h-4 w-2/3" />
+            </div>
+          ) : (
+            <div className="mt-2 whitespace-pre-wrap rounded-lg border border-border bg-background px-3 py-3 text-sm leading-6">
+              {draftBody ? draftBody : draftPreview(message)}
+            </div>
+          )}
         </section>
 
         {scheduling ? (

@@ -1,8 +1,12 @@
+import { createHash } from "node:crypto";
 import { Agent, run } from "@openai/agents";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { env } from "@/lib/config/env";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
+import { db } from "@/server/db";
+import { dailyBrief as dailyBriefTable } from "@/server/db/schema";
 
 export type DailyBriefResult =
   | { configured: false; brief: string; highlights: string[] }
@@ -89,22 +93,74 @@ function cleanBrief(text: string) {
     .trim();
 }
 
+/** Model used for briefs — stored per row so a model/prompt bump invalidates. */
+const BRIEF_MODEL = "gpt-4.1-mini";
+
+/**
+ * Hash only the fields whose change should justify a fresh paragraph. Counts
+ * jittering elsewhere (open slots, etc.) won't invalidate the cached brief.
+ */
+function briefSignature(input: z.infer<typeof dailyBriefInput>): string {
+  const reduced = {
+    needsReply: input.needsReply,
+    waitingCount: input.waitingCount,
+    eventCount: input.eventCount,
+    bestSlot: input.bestSlot,
+    topSubject: input.topMessages[0]?.subject ?? null,
+  };
+  return createHash("sha256").update(JSON.stringify(reduced)).digest("hex");
+}
+
 export const workspaceRouter = createTRPCRouter({
   dailyBrief: protectedProcedure
     .input(dailyBriefInput)
-    .query(async ({ input }): Promise<DailyBriefResult> => {
+    .query(async ({ ctx, input }): Promise<DailyBriefResult> => {
+      const briefHighlights = highlightSchema
+        .array()
+        .parse(highlights(input))
+        .map((h) => `${h.label}: ${h.detail}`);
       const fallback = deterministicBrief(input);
+
       if (!env.OPENAI_API_KEY) {
+        // Don't persist the deterministic fallback — a real brief replaces it
+        // once the key is set.
         return {
           configured: false,
           brief: fallback,
-          highlights: highlights(input).map((h) => `${h.label}: ${h.detail}`),
+          highlights: briefHighlights,
+        };
+      }
+
+      const userId = ctx.session.user.id;
+      const date = new Date().toISOString().slice(0, 10);
+      const id = `${userId}:${date}`;
+      const signature = briefSignature(input);
+
+      // Read-through: reuse today's brief while its shape + model still match.
+      const [cached] = await db
+        .select({
+          brief: dailyBriefTable.brief,
+          signature: dailyBriefTable.signature,
+          model: dailyBriefTable.model,
+        })
+        .from(dailyBriefTable)
+        .where(eq(dailyBriefTable.id, id))
+        .limit(1);
+      if (
+        cached &&
+        cached.signature === signature &&
+        cached.model === BRIEF_MODEL
+      ) {
+        return {
+          configured: true,
+          brief: cached.brief,
+          highlights: briefHighlights,
         };
       }
 
       const agent = new Agent({
         name: "slotnest-daily-brief",
-        model: "gpt-4.1-mini",
+        model: BRIEF_MODEL,
         instructions: BRIEF_INSTRUCTIONS,
       });
 
@@ -113,13 +169,15 @@ export const workspaceRouter = createTRPCRouter({
         `Daily workspace data:\n${JSON.stringify(input, null, 2)}\n\nWrite the brief.`,
       );
       const brief = cleanBrief(result.finalOutput ?? "") || fallback;
-      return {
-        configured: true,
-        brief,
-        highlights: highlightSchema
-          .array()
-          .parse(highlights(input))
-          .map((h) => `${h.label}: ${h.detail}`),
-      };
+
+      await db
+        .insert(dailyBriefTable)
+        .values({ id, userId, date, signature, model: BRIEF_MODEL, brief })
+        .onConflictDoUpdate({
+          target: dailyBriefTable.id,
+          set: { signature, model: BRIEF_MODEL, brief, updatedAt: new Date() },
+        });
+
+      return { configured: true, brief, highlights: briefHighlights };
     }),
 });

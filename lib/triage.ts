@@ -27,6 +27,10 @@ export type TriageInput = {
   fromEmail: string;
   unread: boolean;
   date: Date | string | null;
+  /** Gmail label ids (e.g. CATEGORY_PROMOTIONS, IMPORTANT) — the real signal. */
+  labelIds?: string[];
+  /** True when the message carries a List-Unsubscribe header (bulk mail). */
+  listUnsubscribe?: boolean;
 };
 
 const URGENT_CUES = [
@@ -100,18 +104,34 @@ function hasCue(haystack: string, cues: string[]): boolean {
 export function triage(input: TriageInput): Triage {
   const text = `${input.subject} ${input.snippet}`.toLowerCase();
   const from = input.fromEmail.toLowerCase();
+  const labels = input.labelIds ?? [];
+
+  // Gmail already classifies bulk/promotional mail far better than keywords can.
+  // Trust its category labels + the List-Unsubscribe header over guessing.
+  const isBulk =
+    labels.includes("CATEGORY_PROMOTIONS") ||
+    labels.includes("CATEGORY_SOCIAL") ||
+    labels.includes("CATEGORY_FORUMS") ||
+    Boolean(input.listUnsubscribe);
+  const important = labels.includes("IMPORTANT");
 
   // --- Action ---
   let action: TriageAction;
-  if (hasCue(from, IGNORE_CUES) || hasCue(text, IGNORE_CUES)) {
+  if (isBulk || hasCue(from, IGNORE_CUES) || hasCue(text, IGNORE_CUES)) {
+    // Promotions, social, forums, newsletters, receipts — never a reply.
     action = "Ignore";
   } else if (hasCue(text, REPLY_CUES)) {
     action = "Needs reply";
-  } else if (hasCue(text, FYI_CUES) || !input.unread) {
+  } else if (hasCue(text, FYI_CUES)) {
     action = "FYI";
-  } else {
-    // Unread, no clear cue — default to needing attention.
+  } else if (input.unread && important) {
+    // Gmail flagged it important and it's unread — treat as actionable.
     action = "Needs reply";
+  } else {
+    // No reply cue and not flagged important: informational, not an action.
+    // (Previously this defaulted to "Needs reply", which flooded the queue
+    // with every uncategorized newsletter.)
+    action = "FYI";
   }
 
   // --- Urgency ---
@@ -119,7 +139,11 @@ export function triage(input: TriageInput): Triage {
   let urgency: TriageUrgency;
   if (action === "Ignore") {
     urgency = "Low";
-  } else if (hasCue(text, URGENT_CUES) || (input.unread && ageMs < DAY_MS)) {
+  } else if (
+    hasCue(text, URGENT_CUES) ||
+    (important && input.unread) ||
+    (input.unread && ageMs < DAY_MS)
+  ) {
     urgency = "Urgent";
   } else if (input.unread && ageMs < 3 * DAY_MS) {
     urgency = "Normal";

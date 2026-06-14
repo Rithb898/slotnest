@@ -15,7 +15,11 @@ import { triage } from "@/lib/triage";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { corsair } from "@/server/corsair";
 import { db } from "@/server/db";
-import { corsairAccounts, corsairIntegrations } from "@/server/db/schema";
+import {
+  corsairAccounts,
+  corsairIntegrations,
+  replyDraft,
+} from "@/server/db/schema";
 
 /**
  * Returns true if the signed-in tenant has a gmail account. Mirrors
@@ -38,6 +42,9 @@ async function isGmailConnected(userId: string): Promise<boolean> {
 type DraftReplyResult =
   | { configured: false; text: string }
   | { configured: true; text: string };
+
+/** Model used for drafts — stored on each row so prompt/model bumps invalidate. */
+const DRAFT_MODEL = "gpt-4.1-mini";
 
 const DRAFT_REPLY_INSTRUCTIONS = `You write concise plain-text email replies for SlotNest.
 
@@ -129,15 +136,22 @@ export const gmailRouter = createTRPCRouter({
           const references = getHeader(headers, "References") ?? null;
           const snippet = msg.snippet ?? "";
           const date = toDate(msg.internalDate);
-          const unread = (msg.labelIds ?? []).includes("UNREAD");
-          // Heuristic triage (no LLM) — see lib/triage.ts. Computed per-request;
-          // cheap enough that a local cache isn't warranted yet.
+          const labelIds = msg.labelIds ?? [];
+          const unread = labelIds.includes("UNREAD");
+          const listUnsubscribe = Boolean(
+            getHeader(headers, "List-Unsubscribe"),
+          );
+          // Heuristic triage (no LLM) — see lib/triage.ts. Gmail's category
+          // labels + List-Unsubscribe header do the heavy lifting for bulk mail.
+          // Computed per-request; cheap enough that a local cache isn't warranted.
           const labels = triage({
             subject,
             snippet,
             fromEmail: from.email,
             unread,
             date,
+            labelIds,
+            listUnsubscribe,
           });
           return {
             id: msg.id ?? id,
@@ -207,12 +221,14 @@ export const gmailRouter = createTRPCRouter({
         subject: z.string().min(1),
         body: z.string().min(1),
         threadId: z.string().min(1),
+        messageId: z.string().optional(),
         inReplyTo: z.string().optional(),
         references: z.string().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const tenant = corsair.withTenant(ctx.session.user.id);
+      const userId = ctx.session.user.id;
+      const tenant = corsair.withTenant(userId);
       const sent = await tenant.gmail.api.messages.send({
         raw: buildRfc2822ReplyRaw({
           to: input.to,
@@ -224,6 +240,26 @@ export const gmailRouter = createTRPCRouter({
         threadId: input.threadId,
       });
 
+      // Keep the draft cache in sync with what was actually sent.
+      if (input.messageId) {
+        const id = `${userId}:${input.messageId}`;
+        await db
+          .insert(replyDraft)
+          .values({
+            id,
+            userId,
+            messageId: input.messageId,
+            threadId: input.threadId,
+            body: input.body,
+            model: DRAFT_MODEL,
+            status: "sent",
+          })
+          .onConflictDoUpdate({
+            target: replyDraft.id,
+            set: { body: input.body, status: "sent", updatedAt: new Date() },
+          });
+      }
+
       return {
         id: sent.id ?? null,
         threadId: sent.threadId ?? input.threadId,
@@ -231,13 +267,45 @@ export const gmailRouter = createTRPCRouter({
     }),
 
   /**
-   * Generate an editable plain-text reply body for one Gmail message. This is
-   * intentionally read-only: the model never sends mail; it only fills the body
-   * that `sendReply` later sends after the user's explicit approval.
+   * Generate (or reuse) an editable plain-text reply body for one Gmail message.
+   * Read-through DB cache: a draft is generated once per message and persisted,
+   * so reloads return the stored body without re-billing the model. The model
+   * never sends mail; it only fills the body that `sendReply` later sends after
+   * the user's explicit approval.
+   *
+   * - Cached `edited` drafts are always returned (user changes win).
+   * - `generated` drafts are reused while the model matches.
+   * - `force: true` regenerates and overwrites (used by a "Regenerate" action).
    */
   draftReply: protectedProcedure
-    .input(z.object({ messageId: z.string().min(1) }))
+    .input(
+      z.object({
+        messageId: z.string().min(1),
+        force: z.boolean().optional(),
+      }),
+    )
     .mutation(async ({ ctx, input }): Promise<DraftReplyResult> => {
+      const userId = ctx.session.user.id;
+      const id = `${userId}:${input.messageId}`;
+
+      if (!input.force) {
+        const [cached] = await db
+          .select({
+            body: replyDraft.body,
+            status: replyDraft.status,
+            model: replyDraft.model,
+          })
+          .from(replyDraft)
+          .where(eq(replyDraft.id, id))
+          .limit(1);
+        if (
+          cached &&
+          (cached.status === "edited" || cached.model === DRAFT_MODEL)
+        ) {
+          return { configured: true, text: cached.body };
+        }
+      }
+
       if (!env.OPENAI_API_KEY) {
         return {
           configured: false,
@@ -245,7 +313,7 @@ export const gmailRouter = createTRPCRouter({
         };
       }
 
-      const tenant = corsair.withTenant(ctx.session.user.id);
+      const tenant = corsair.withTenant(userId);
       const msg = await tenant.gmail.api.messages.get({
         id: input.messageId,
         format: "full",
@@ -254,6 +322,7 @@ export const gmailRouter = createTRPCRouter({
       const headers = msg.payload?.headers;
       const from = parseAddress(getHeader(headers, "From"));
       const subject = getHeader(headers, "Subject") ?? "(no subject)";
+      const threadId = msg.threadId ?? null;
       const body = extractBody(msg.payload as GmailPayload | undefined);
       const sourceText =
         body.text?.trim() ||
@@ -263,7 +332,7 @@ export const gmailRouter = createTRPCRouter({
 
       const agent = new Agent({
         name: "slotnest-draft-reply",
-        model: "gpt-4.1-mini",
+        model: DRAFT_MODEL,
         instructions: DRAFT_REPLY_INSTRUCTIONS,
       });
 
@@ -276,9 +345,31 @@ ${sourceText.slice(0, 8000)}
 Write the reply body now.`;
 
       const result = await run(agent, prompt);
-      return {
-        configured: true,
-        text: cleanDraftText(result.finalOutput ?? ""),
-      };
+      const text = cleanDraftText(result.finalOutput ?? "");
+
+      // Persist for reuse. Overwrites a prior generated/forced draft for this id.
+      await db
+        .insert(replyDraft)
+        .values({
+          id,
+          userId,
+          messageId: input.messageId,
+          threadId,
+          body: text,
+          model: DRAFT_MODEL,
+          status: "generated",
+        })
+        .onConflictDoUpdate({
+          target: replyDraft.id,
+          set: {
+            body: text,
+            model: DRAFT_MODEL,
+            threadId,
+            status: "generated",
+            updatedAt: new Date(),
+          },
+        });
+
+      return { configured: true, text };
     }),
 });
