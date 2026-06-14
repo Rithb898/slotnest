@@ -1,7 +1,9 @@
 "use client";
 import { Archive, CalendarPlus, PenLine, Reply } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { InviteDialog, type InviteDraft } from "@/components/invite-dialog";
 import { TriageChips } from "@/components/triage-chips";
+import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -233,7 +235,11 @@ function MessageView({ id }: { id: string }) {
           {formatDate(m.date, true)}
         </p>
       </header>
-      <ActionBar />
+      <ActionBar
+        subject={m.subject}
+        fromName={m.fromName}
+        fromEmail={m.fromEmail}
+      />
       <div className="flex-1 overflow-y-auto">
         {m.html ? (
           <iframe
@@ -255,12 +261,32 @@ function MessageView({ id }: { id: string }) {
 /**
  * Reading-pane action bar (DESIGN: "/inbox upgrades").
  *
- * Buttons render but are placeholders for this version: Draft reply and
- * → Invite depend on the deferred Agent; Archive and Reply depend on Corsair
- * write contracts that aren't documented yet (a STOP condition to invent).
- * They are disabled with explanatory tooltips rather than wired to any write.
+ * "→ Invite" is LIVE (plan 003 step 5): it turns the open email into a draft
+ * calendar invite — prefilling the title from the subject and the attendee from
+ * the sender — which the user reviews and approves before anything is sent
+ * (draft-then-approve via <InviteDialog/>).
+ *
+ * Draft reply / Archive / Reply remain placeholders: they depend on the Agent
+ * and on Gmail write contracts not yet documented (inventing them is a STOP
+ * condition). They are disabled with explanatory tooltips.
  */
-function ActionBar() {
+function ActionBar({
+  subject,
+  fromName,
+  fromEmail,
+}: {
+  subject: string;
+  fromName: string | null;
+  fromEmail: string;
+}) {
+  const [inviteOpen, setInviteOpen] = useState(false);
+
+  const draft: InviteDraft = {
+    summary: subject && subject !== "(no subject)" ? subject : "Meeting",
+    attendees: fromEmail ? [fromEmail] : undefined,
+    description: `Re: "${subject}" from ${fromName || fromEmail}.`,
+  };
+
   return (
     <div className="flex items-center gap-1 border-b border-border px-6 py-2">
       <PlaceholderAction
@@ -268,10 +294,18 @@ function ActionBar() {
         label="Draft reply"
         reason="Needs the AI assistant (coming soon)"
       />
-      <PlaceholderAction
-        icon={CalendarPlus}
-        label="→ Invite"
-        reason="Needs the AI assistant (coming soon)"
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setInviteOpen(true)}
+        className="font-medium"
+      >
+        <CalendarPlus className="size-4" />→ Invite
+      </Button>
+      <InviteDialog
+        open={inviteOpen}
+        onOpenChange={setInviteOpen}
+        draft={draft}
       />
       <PlaceholderAction
         icon={Archive}

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, CalendarDays, Sparkles } from "lucide-react";
+import { ArrowRight, CalendarDays, Clock, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
 
@@ -10,6 +10,24 @@ import { Kbd } from "@/components/ui/kbd";
 import { Skeleton } from "@/components/ui/skeleton";
 import { triagePriority } from "@/lib/triage";
 import { api } from "@/trpc/react";
+
+function sameDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function fmtTime(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
 
 /**
  * /today — the "approve, don't read" home (DESIGN + plan 003).
@@ -25,6 +43,26 @@ import { api } from "@/trpc/react";
 export function TodayClient() {
   const router = useRouter();
   const inbox = api.gmail.inbox.useQuery({});
+
+  // Today's calendar window (00:00 → 24:00 local) for zone 2.
+  const todayRange = useMemo(() => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+    return { timeMin: start.toISOString(), timeMax: end.toISOString() };
+  }, []);
+  const calendar = api.calendar.events.useQuery(todayRange);
+
+  const todayEvents = useMemo(() => {
+    if (!calendar.data || calendar.data.connected === false) return [];
+    const today = new Date();
+    return calendar.data.events
+      .filter((e) => (e.start ? sameDay(new Date(e.start), today) : false))
+      .sort((a, b) => (a.start ?? "").localeCompare(b.start ?? ""))
+      .slice(0, 6);
+  }, [calendar.data]);
+
+  const calendarConnected = calendar.data?.connected ?? true;
 
   const needsReply = useMemo(() => {
     if (!inbox.data) return [];
@@ -104,25 +142,53 @@ export function TodayClient() {
           )}
         </section>
 
-        {/* Zone 2 — On your calendar today (deferred → honest placeholder) */}
+        {/* Zone 2 — On your calendar today (real Google Calendar data) */}
         <section className="flex flex-col gap-3">
           <h2 className="text-base font-semibold">On your calendar today</h2>
-          <EmptyCard>
-            <span className="flex items-center gap-2">
-              <CalendarDays className="size-4 shrink-0 text-muted-foreground" />
-              <span>
-                Calendar isn&apos;t connected yet.{" "}
-                <button
-                  type="button"
-                  className="text-[var(--honey-ink)] underline"
-                  onClick={() => router.push("/connections")}
-                >
-                  Connect Google Calendar
-                </button>{" "}
-                to see today&apos;s events and free gaps.
+          {calendar.isLoading ? (
+            <ZoneSkeleton />
+          ) : calendarConnected === false ? (
+            <EmptyCard>
+              <span className="flex items-center gap-2">
+                <CalendarDays className="size-4 shrink-0 text-muted-foreground" />
+                <span>
+                  Calendar isn&apos;t connected yet.{" "}
+                  <button
+                    type="button"
+                    className="text-[var(--honey-ink)] underline"
+                    onClick={() => router.push("/connections")}
+                  >
+                    Connect Google Calendar
+                  </button>{" "}
+                  to see today&apos;s events and free gaps.
+                </span>
               </span>
-            </span>
-          </EmptyCard>
+            </EmptyCard>
+          ) : todayEvents.length === 0 ? (
+            <EmptyCard>Nothing on your calendar today. Clear runway.</EmptyCard>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {todayEvents.map((e) => (
+                <li key={e.id}>
+                  <button
+                    type="button"
+                    onClick={() => router.push("/calendar")}
+                    className="flex w-full items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3 text-left transition-shadow hover:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_2px_8px_rgba(0,0,0,0.06)]"
+                  >
+                    <span className="truncate text-[0.9375rem] font-medium">
+                      {e.summary}
+                    </span>
+                    <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                      <Clock className="size-3.5" />
+                      {e.allDay
+                        ? "All day"
+                        : `${fmtTime(e.start)} – ${fmtTime(e.end)}`}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
 
         {/* Zone 3 — Ask SlotNest */}
