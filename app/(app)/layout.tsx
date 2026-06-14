@@ -24,8 +24,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <CommandBar>
       <div className="flex h-svh w-full overflow-hidden">
         <AppSidebar />
-        {/* pb-16 keeps content clear of the mobile bottom bar. */}
-        <main className="flex-1 overflow-hidden pb-16 md:pb-0">
+        {/* data-lenis-prevent: the app shell scrolls inside this <main>, not the
+         * window — without it the root Lenis instance swallows wheel events and
+         * the page can't scroll. */}
+        <main className="min-h-0 flex-1 overflow-y-auto" data-lenis-prevent>
           <Suspense fallback={children}>
             <AuthGate>{children}</AuthGate>
           </Suspense>

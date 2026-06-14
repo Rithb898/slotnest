@@ -22,3 +22,5 @@ For anything Corsair-related (integrations, OAuth, plugins, Gmail, Google Calend
 - `docs/corsair/` — introduction, installation, quick-start, openai-agents
 
 If the docs folder does not cover what you need, STOP and tell the user to add the relevant doc file rather than guessing the API.
+
+Don't run `build` and `dev` commands.

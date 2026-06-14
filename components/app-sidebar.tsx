@@ -2,7 +2,6 @@
 
 import {
   CalendarDays,
-  Check,
   ChevronsUpDown,
   Inbox,
   LogOut,
@@ -17,10 +16,10 @@ import type { Route } from "next";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useCommandBar } from "@/components/command-bar";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,6 +35,7 @@ import {
   InputGroupInput,
 } from "@/components/ui/input-group";
 import { Kbd } from "@/components/ui/kbd";
+import { useIsMac } from "@/hooks/use-is-mac";
 import { cn } from "@/lib/utils";
 import { authClient } from "@/server/auth/client";
 import { api } from "@/trpc/react";
@@ -88,24 +88,6 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-/**
- * True on macOS/iOS. Defaults to `false` so SSR and the first client render
- * agree (no hydration mismatch); the real value lands after mount. ⌘K and
- * Ctrl K both work — see the keydown handler in command-bar.tsx.
- */
-function useIsMac(): boolean {
-  const [isMac, setIsMac] = useState(false);
-  useEffect(() => {
-    const ua =
-      // @ts-expect-error userAgentData is not yet in all lib.dom typings.
-      navigator.userAgentData?.platform ??
-      navigator.platform ??
-      navigator.userAgent;
-    setIsMac(/mac|iphone|ipad|ipod/i.test(ua));
-  }, []);
-  return isMac;
-}
-
 function isToday(date: Date): boolean {
   const now = new Date();
   return (
@@ -126,15 +108,23 @@ export function AppSidebar() {
   const inbox = api.gmail.inbox.useQuery({});
   const connections = api.connections.list.useQuery();
 
-  // (6) Today's events. Same midnight→midnight range as /today, so the cache
-  // key matches and no extra fetch happens on that page.
-  const todayRange = useMemo(() => {
+  // (6) Today's events. The range reads the current time, which isn't allowed
+  // during prerender (the sidebar sits outside the layout's Suspense boundary),
+  // so we compute it on the client after mount and skip the query until then.
+  // Same midnight→midnight range as /today, so the cache key matches there.
+  const [todayRange, setTodayRange] = useState<{
+    timeMin: string;
+    timeMax: string;
+  }>();
+  useEffect(() => {
     const start = new Date();
     start.setHours(0, 0, 0, 0);
     const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
-    return { timeMin: start.toISOString(), timeMax: end.toISOString() };
+    setTodayRange({ timeMin: start.toISOString(), timeMax: end.toISOString() });
   }, []);
-  const calendar = api.calendar.events.useQuery(todayRange);
+  const calendar = api.calendar.events.useQuery(todayRange, {
+    enabled: !!todayRange,
+  });
 
   const needsYou =
     inbox.data?.messages.filter((m) => m.triage.action === "Needs reply")
@@ -179,9 +169,11 @@ export function AppSidebar() {
             href="/today"
             className="flex items-center gap-2 text-base font-semibold tracking-tight"
           >
-            <span className="grid size-6 place-items-center rounded-md bg-primary text-[var(--primary-foreground)]">
-              <Sun className="size-3.5" />
-            </span>
+            <Avatar className="size-6 rounded-md">
+              <AvatarFallback className="rounded-md bg-primary text-[var(--primary-foreground)]">
+                <Sun className="size-3.5" />
+              </AvatarFallback>
+            </Avatar>
             SlotNest
           </Link>
         </div>
@@ -251,19 +243,18 @@ export function AppSidebar() {
           </div>
         </nav>
 
-        <div className="border-t border-border p-2">
+        <div className="flex flex-col gap-2 border-t border-border p-2">
+          <ThemeToggle />
           <AccountMenu />
         </div>
       </aside>
 
       {/* Mobile bottom bar */}
       <nav className="fixed inset-x-0 bottom-0 z-40 flex border-t border-border bg-[var(--sidebar)] md:hidden">
-        {[...PRIMARY, ...SECONDARY].map((item) => {
+        {PRIMARY.map((item) => {
           const active = isActive(pathname, item.href);
           const Icon = item.icon;
           const showCount = item.href === "/inbox" && needsYou > 0;
-          const showDot =
-            item.href === "/connections" && health && health !== "ok";
           return (
             <Link
               key={item.href}
@@ -286,14 +277,6 @@ export function AppSidebar() {
                     {needsYou > 9 ? "9+" : needsYou}
                   </span>
                 ) : null}
-                {showDot ? (
-                  <span
-                    className={cn(
-                      "absolute -right-1.5 -top-0.5 size-2 rounded-full ring-2 ring-[var(--sidebar)]",
-                      health === "none" ? "bg-urgent" : "bg-primary",
-                    )}
-                  />
-                ) : null}
               </span>
               <span>{labelFor(item)}</span>
             </Link>
@@ -307,6 +290,7 @@ export function AppSidebar() {
           <Search className="size-5" />
           <span>Search</span>
         </button>
+        <AccountMenu variant="bar" health={health} />
       </nav>
     </>
   );
@@ -314,7 +298,7 @@ export function AppSidebar() {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="px-3 pb-1 text-[0.6875rem] font-medium tracking-wide text-muted-foreground/70 uppercase">
+    <p className="px-3 pb-1 text-xs font-medium text-muted-foreground/70">
       {children}
     </p>
   );
@@ -344,6 +328,11 @@ function SidebarLink({
           : "text-foreground hover:bg-accent",
       )}
       aria-current={active ? "page" : undefined}
+      title={
+        shortcut
+          ? `${label ?? item.label} — press ${shortcut.split(" ").join(" then ")}`
+          : undefined
+      }
     >
       {/* 2px leading honey rail — only on the active item. */}
       {active ? (
@@ -356,13 +345,16 @@ function SidebarLink({
       <span className="truncate">{label ?? item.label}</span>
 
       <span className="ml-auto flex items-center">
-        {/* (4) `g`-chord hint — appears on hover/focus, swaps out the badge. */}
+        {/* (4) `g`-chord hint — two keys pressed in sequence (e.g. G then T).
+            Appears on hover/focus, swapping out the badge. */}
         {shortcut ? (
           <span
-            className="hidden font-mono text-[0.6875rem] tracking-wide text-muted-foreground/70 group-hover:inline group-focus-visible:inline"
+            className="hidden items-center gap-1 group-hover:flex group-focus-visible:flex"
             aria-hidden
           >
-            {shortcut}
+            {shortcut.split(" ").map((key) => (
+              <Kbd key={key}>{key}</Kbd>
+            ))}
           </span>
         ) : null}
         {trailing ? (
@@ -430,20 +422,64 @@ function StatusDot({ health }: { health: ConnHealth }) {
 
 const THEMES = [
   { value: "light", label: "Light", icon: SunMedium },
-  { value: "dark", label: "Dark", icon: Moon },
   { value: "system", label: "System", icon: Monitor },
+  { value: "dark", label: "Dark", icon: Moon },
 ] as const;
 
-function AccountMenu() {
-  const router = useRouter();
-  const { data: session } = authClient.useSession();
-  const user = session?.user;
-
-  // (5) Theme toggle. `mounted` guards against SSR/client theme mismatch so
-  // the active check only renders once the real theme is known.
+/**
+ * (5) Visible theme toggle — a 3-way segmented control (Light / System / Dark).
+ * `mounted` guards against an SSR/client mismatch so the active pill only
+ * paints once the real theme is known.
+ */
+function ThemeToggle() {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+
+  return (
+    <div className="flex items-center gap-1 rounded-lg bg-muted/60 p-1">
+      {THEMES.map(({ value, label, icon: ThemeIcon }) => {
+        const active = mounted && theme === value;
+        return (
+          <button
+            key={value}
+            type="button"
+            aria-pressed={active}
+            aria-label={label}
+            title={label}
+            onClick={() => setTheme(value)}
+            className={cn(
+              "flex h-7 flex-1 items-center justify-center rounded-md transition-colors",
+              active
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <ThemeIcon className="size-4" />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * Account menu. `variant="rail"` is the full-width desktop footer row;
+ * `variant="bar"` is a compact icon tab for the mobile bottom bar. The mobile
+ * dropdown also carries the theme toggle (the desktop footer shows it inline).
+ */
+function AccountMenu({
+  variant = "rail",
+  health,
+}: {
+  variant?: "rail" | "bar";
+  health?: ConnHealth | null;
+}) {
+  const router = useRouter();
+  const { data: session } = authClient.useSession();
+  const user = session?.user;
+  const avatarUrl = user?.image ?? undefined;
+  const needsConnect = !!health && health !== "ok";
 
   const name = user?.name?.trim() || user?.email?.split("@")[0] || "Account";
   const email = user?.email ?? "";
@@ -460,34 +496,70 @@ function AccountMenu() {
     router.push("/sign-in");
   }
 
+  const trigger =
+    variant === "bar" ? (
+      <button
+        type="button"
+        className="flex min-h-[44px] flex-1 flex-col items-center justify-center gap-0.5 py-2 text-xs text-muted-foreground"
+      />
+    ) : (
+      <button
+        type="button"
+        className="flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent"
+      />
+    );
+
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <button
-            type="button"
-            className="flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent"
-          />
-        }
-      >
-        <Avatar className="size-7 shrink-0 rounded-md">
-          <AvatarFallback className="rounded-md bg-primary/15 text-xs font-semibold text-[var(--honey-ink)]">
-            {initials}
-          </AvatarFallback>
-        </Avatar>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium leading-tight">
-            {name}
-          </span>
-          {email ? (
-            <span className="block truncate text-xs leading-tight text-muted-foreground">
-              {email}
+      <DropdownMenuTrigger render={trigger}>
+        {variant === "bar" ? (
+          <>
+            <span className="relative">
+              <Avatar className="size-5 shrink-0 rounded-full">
+                <AvatarImage src={avatarUrl} alt={name} />
+                <AvatarFallback className="rounded-full bg-primary/15 text-[0.625rem] font-semibold text-[var(--honey-ink)]">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              {needsConnect ? (
+                <span
+                  className={cn(
+                    "absolute -right-0.5 -top-0.5 size-2 rounded-full ring-2 ring-[var(--sidebar)]",
+                    health === "none" ? "bg-urgent" : "bg-primary",
+                  )}
+                  aria-hidden
+                />
+              ) : null}
             </span>
-          ) : null}
-        </span>
-        <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
+            <span>Account</span>
+          </>
+        ) : (
+          <>
+            <Avatar className="size-7 shrink-0 rounded-md">
+              <AvatarImage src={avatarUrl} alt={name} />
+              <AvatarFallback className="rounded-md bg-primary/15 text-xs font-semibold text-[var(--honey-ink)]">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium leading-tight">
+                {name}
+              </span>
+              {email ? (
+                <span className="block truncate text-xs leading-tight text-muted-foreground">
+                  {email}
+                </span>
+              ) : null}
+            </span>
+            <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
+          </>
+        )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" side="top" className="w-56">
+      <DropdownMenuContent
+        align={variant === "bar" ? "center" : "end"}
+        side="top"
+        className="w-56"
+      >
         <DropdownMenuGroup>
           <DropdownMenuLabel className="font-normal">
             <span className="block text-sm font-medium">{name}</span>
@@ -498,26 +570,30 @@ function AccountMenu() {
             ) : null}
           </DropdownMenuLabel>
         </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuGroup>
-          <DropdownMenuLabel className="text-xs font-medium text-muted-foreground/80">
-            Theme
-          </DropdownMenuLabel>
-          {THEMES.map(({ value, label, icon: ThemeIcon }) => (
-            <DropdownMenuItem
-              key={value}
-              // Keep the menu open so users can preview themes without reopening.
-              closeOnClick={false}
-              onClick={() => setTheme(value)}
-            >
-              <ThemeIcon className="size-4" />
-              {label}
-              {mounted && theme === value ? (
-                <Check className="ml-auto size-4" />
-              ) : null}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuGroup>
+        {/* Connections + theme live in the mobile menu (folded out of the bar). */}
+        {variant === "bar" ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuItem onClick={() => router.push("/connections")}>
+                <Plug className="size-4" />
+                {health === "none" ? "Connect accounts" : "Connections"}
+                {health ? (
+                  <span className="ml-auto">
+                    <StatusDot health={health} />
+                  </span>
+                ) : null}
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <div className="px-1.5 py-1">
+              <p className="px-1 pb-1.5 text-xs font-medium text-muted-foreground/80">
+                Theme
+              </p>
+              <ThemeToggle />
+            </div>
+          </>
+        ) : null}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleSignOut} variant="destructive">
           <LogOut className="size-4" />
