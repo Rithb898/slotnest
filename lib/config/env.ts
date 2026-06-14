@@ -13,6 +13,9 @@ export const env = createEnv({
     RESEND_API_KEY: z.string(),
     EMAIL_FROM: z.string(),
     APP_URL: z.url(),
+    // Optional: powers the ⌘K natural-language agent. The app stays valid
+    // without it; the agent route degrades to "not configured" when unset.
+    OPENAI_API_KEY: z.string().optional(),
   },
   client: {},
   runtimeEnv: {
@@ -26,6 +29,7 @@ export const env = createEnv({
     RESEND_API_KEY: process.env.RESEND_API_KEY,
     EMAIL_FROM: process.env.EMAIL_FROM,
     APP_URL: process.env.APP_URL,
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
   },
   /**
    * Makes it so that empty strings are treated as undefined. `SOME_VAR: z.string()` and
