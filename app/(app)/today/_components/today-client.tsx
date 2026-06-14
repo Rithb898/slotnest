@@ -21,6 +21,7 @@ import { useMemo, useState } from "react";
 
 import { useCommandBar } from "@/components/command-bar";
 import { InviteDialog, type InviteDraft } from "@/components/invite-dialog";
+import { ReplyDialog, type ReplyDraft } from "@/components/reply-dialog";
 import { TriageChips } from "@/components/triage-chips";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -28,6 +29,11 @@ import { Kbd } from "@/components/ui/kbd";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useIsMac } from "@/hooks/use-is-mac";
 import { CALENDAR_POLL_OPTIONS, INBOX_POLL_OPTIONS } from "@/lib/query-options";
+import {
+  cleanReplySubject,
+  toReplyReferences,
+  toReplySubject,
+} from "@/lib/reply";
 import { type Triage, triagePriority } from "@/lib/triage";
 import { cn } from "@/lib/utils";
 import { authClient } from "@/server/auth/client";
@@ -41,9 +47,12 @@ type Slot = { start: string; end: string };
 
 type TodayMessage = {
   id: string;
+  threadId: string | null;
   fromName: string | null;
   fromEmail: string;
   subject: string;
+  messageIdHeader: string | null;
+  references: string | null;
   snippet: string;
   date: Date | string | null;
   triage: Triage;
@@ -208,10 +217,6 @@ function dailySummary({
   return "SlotNest is watching for the next thing that needs you.";
 }
 
-function cleanSubject(subject: string): string {
-  return subject.replace(/^(re|fw|fwd):\s*/i, "").trim() || "Meeting";
-}
-
 function followUpReason(input: { subject: string; snippet: string }): string {
   const text = `${input.subject} ${input.snippet}`.toLowerCase();
   if (text.includes("follow up") || text.includes("following up")) {
@@ -239,6 +244,9 @@ export function TodayClient() {
   );
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteDraft, setInviteDraft] = useState<InviteDraft | null>(null);
+  const [replyOpen, setReplyOpen] = useState(false);
+  const [replyDraft, setReplyDraft] = useState<ReplyDraft | null>(null);
+  const [replyMessageId, setReplyMessageId] = useState<string | null>(null);
   // `connections.list` is the cheap, never-throwing source of truth for what's
   // connected. The heavy Gmail/Calendar queries are gated on it, so a brand-new
   // account never fires (or retries) them — the onboarding screen shows at once.
@@ -341,7 +349,7 @@ export function TodayClient() {
     const defaultStart = slot?.start;
     const defaultEnd = slot?.end;
     setInviteDraft({
-      summary: cleanSubject(message.subject),
+      summary: cleanReplySubject(message.subject, "Meeting"),
       start: defaultStart,
       end: defaultEnd,
       attendees: [message.fromEmail],
@@ -350,6 +358,24 @@ export function TodayClient() {
       }`,
     });
     setInviteOpen(true);
+  }
+
+  function openReplyFromMessage(message: TodayMessage) {
+    if (!message.threadId) return;
+    setReplyMessageId(message.id);
+    setReplyDraft({
+      to: message.fromEmail,
+      subject: toReplySubject(message.subject),
+      body: "",
+      messageId: message.id,
+      threadId: message.threadId,
+      inReplyTo: message.messageIdHeader,
+      references: toReplyReferences(
+        message.references,
+        message.messageIdHeader,
+      ),
+    });
+    setReplyOpen(true);
   }
 
   return (
@@ -412,7 +438,7 @@ export function TodayClient() {
                 message={nextAction}
                 slot={firstSlot}
                 state={actionStates[nextAction.id]}
-                onApprove={() => setAction(nextAction.id, "approved")}
+                onApprove={() => openReplyFromMessage(nextAction)}
                 onEdit={() => router.push("/inbox")}
                 onSkip={() => setAction(nextAction.id, "skipped")}
                 onInvite={() => openInviteFromMessage(nextAction, firstSlot)}
@@ -447,7 +473,7 @@ export function TodayClient() {
                         slot={firstSlot}
                         state={actionStates[m.id]}
                         onOpen={() => router.push("/inbox")}
-                        onApprove={() => setAction(m.id, "approved")}
+                        onApprove={() => openReplyFromMessage(m)}
                         onSkip={() => setAction(m.id, "skipped")}
                         onInvite={() => openInviteFromMessage(m, firstSlot)}
                       />
@@ -535,6 +561,14 @@ export function TodayClient() {
         open={inviteOpen}
         onOpenChange={setInviteOpen}
         draft={inviteDraft}
+      />
+      <ReplyDialog
+        open={replyOpen}
+        onOpenChange={setReplyOpen}
+        draft={replyDraft}
+        onSent={() => {
+          if (replyMessageId) setAction(replyMessageId, "approved");
+        }}
       />
     </div>
   );

@@ -13,7 +13,7 @@ export const env = createEnv({
     RESEND_API_KEY: z.string(),
     EMAIL_FROM: z.string(),
     APP_URL: z.url(),
-    OPENAI_API_KEY: z.string(),
+    OPENAI_API_KEY: z.string().optional(),
   },
   client: {},
   runtimeEnv: {

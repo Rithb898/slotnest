@@ -1,7 +1,8 @@
 "use client";
-import { Archive, CalendarPlus, PenLine, Reply } from "lucide-react";
+import { Archive, CalendarPlus, PenLine } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { InviteDialog, type InviteDraft } from "@/components/invite-dialog";
+import { ReplyDialog, type ReplyDraft } from "@/components/reply-dialog";
 import { TriageChips } from "@/components/triage-chips";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
@@ -13,6 +14,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { INBOX_POLL_OPTIONS } from "@/lib/query-options";
+import { toReplyReferences, toReplySubject } from "@/lib/reply";
 import type { TriageAction } from "@/lib/triage";
 import { cn } from "@/lib/utils";
 import { api } from "@/trpc/react";
@@ -244,9 +246,13 @@ function MessageView({ id }: { id: string }) {
         </p>
       </header>
       <ActionBar
+        id={m.id}
         subject={m.subject}
         fromName={m.fromName}
         fromEmail={m.fromEmail}
+        threadId={m.threadId}
+        messageIdHeader={m.messageIdHeader}
+        references={m.references}
       />
       <div className="flex-1 overflow-y-auto">
         {m.html ? (
@@ -274,34 +280,82 @@ function MessageView({ id }: { id: string }) {
  * the sender — which the user reviews and approves before anything is sent
  * (draft-then-approve via <InviteDialog/>).
  *
- * Draft reply / Archive / Reply remain placeholders: they depend on the Agent
- * and on Gmail write contracts not yet documented (inventing them is a STOP
- * condition). They are disabled with explanatory tooltips.
+ * Draft reply is LIVE (plans 004/005): it opens the same draft-then-approve
+ * dialog used from /today, with optional on-demand AI fill. Archive is still
+ * not wired.
  */
 function ActionBar({
+  id,
   subject,
   fromName,
   fromEmail,
+  threadId,
+  messageIdHeader,
+  references,
 }: {
+  id: string;
   subject: string;
   fromName: string | null;
   fromEmail: string;
+  threadId: string | null;
+  messageIdHeader: string | null;
+  references: string | null;
 }) {
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [replyOpen, setReplyOpen] = useState(false);
 
   const draft: InviteDraft = {
     summary: subject && subject !== "(no subject)" ? subject : "Meeting",
     attendees: fromEmail ? [fromEmail] : undefined,
     description: `Re: "${subject}" from ${fromName || fromEmail}.`,
   };
+  const replyDraft: ReplyDraft | null =
+    threadId && fromEmail
+      ? {
+          to: fromEmail,
+          subject: toReplySubject(subject),
+          body: "",
+          messageId: id,
+          threadId,
+          inReplyTo: messageIdHeader,
+          references: toReplyReferences(references, messageIdHeader),
+        }
+      : null;
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey || e.key !== "r" || !replyDraft) {
+        return;
+      }
+      e.preventDefault();
+      setReplyOpen(true);
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [replyDraft]);
 
   return (
     <div className="flex items-center gap-1 border-b border-border px-6 py-2">
-      <PlaceholderAction
-        icon={PenLine}
-        label="Draft reply"
-        reason="Needs the AI assistant (coming soon)"
-      />
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setReplyOpen(true)}
+        disabled={!replyDraft}
+        className="font-medium"
+      >
+        <PenLine className="size-4" />
+        Draft reply
+        <Kbd className="ml-1">r</Kbd>
+      </Button>
       <Button
         variant="ghost"
         size="sm"
@@ -321,11 +375,10 @@ function ActionBar({
         reason="Sending/archiving isn't wired yet"
         shortcut="e"
       />
-      <PlaceholderAction
-        icon={Reply}
-        label="Reply"
-        reason="Sending isn't wired yet"
-        shortcut="r"
+      <ReplyDialog
+        open={replyOpen}
+        onOpenChange={setReplyOpen}
+        draft={replyDraft}
       />
     </div>
   );

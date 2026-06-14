@@ -15,7 +15,7 @@ The shared language for SlotNest. Terms only — no implementation details.
 - **Triage** — Classification of an incoming email along two axes: an **Action** label and an **Urgency** level. Combined into a sortable priority.
   - **Action** — What the User must do about an email: `Needs reply` | `FYI` | `Ignore`.
   - **Urgency** — How time-sensitive an email is: `Urgent` | `Normal` | `Low`.
-- **Draft reply** — An LLM-generated reply, matched to the User's tone, pre-prepared for `Needs reply` emails.
+- **Draft reply** — A context-aware LLM-generated reply, editable before the User sends it, for `Needs reply` emails.
 - **Free-slot scheduling** — Finding open time on the User's calendar and proposing/sending an invite at a real free slot, from natural language.
 - **Email→invite** — A one-shot workflow turning an open email into a calendar invite to the sender (time/title extracted by LLM).
 - **Local cache** — Emails/events pushed via Corsair webhooks and persisted in Postgres; the source for fast local search (not live Gmail polling).

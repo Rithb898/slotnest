@@ -106,7 +106,7 @@ function ConnectionsPanel({ connected }: { connected: string[] }) {
        * its own CTA when more than one is missing — otherwise the row handles it. */}
       {missing.length > 1 ? (
         <div className="flex items-center gap-4 rounded-3xl border border-primary/30 bg-primary/5 p-4">
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-[var(--honey-ink)]">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-honey-ink">
             <Sparkles className="size-5" />
           </span>
           <div className="min-w-0 flex-1">
@@ -159,7 +159,7 @@ function ProviderRow({
           "flex size-11 shrink-0 items-center justify-center rounded-2xl",
           isConnected
             ? "bg-success-subtle text-success"
-            : "bg-primary/10 text-[var(--honey-ink)]",
+            : "bg-primary/10 text-honey-ink",
         )}
       >
         <Icon className="size-5" />
@@ -227,7 +227,7 @@ function AccountPanel() {
       <div className="flex items-center gap-4 rounded-3xl bg-card p-5 shadow-sm ring-1 ring-foreground/5 dark:ring-foreground/10">
         <Avatar className="size-12">
           {image ? <AvatarImage src={image} alt={name} /> : null}
-          <AvatarFallback className="bg-primary/15 text-sm font-semibold text-[var(--honey-ink)]">
+          <AvatarFallback className="bg-primary/15 text-sm font-semibold text-honey-ink">
             {initials(name)}
           </AvatarFallback>
         </Avatar>

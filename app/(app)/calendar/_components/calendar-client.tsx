@@ -244,7 +244,7 @@ function NotConnected() {
   return (
     <div className="rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
       Google Calendar isn&apos;t connected yet.{" "}
-      <a href="/settings" className="text-[var(--honey-ink)] underline">
+      <a href="/settings" className="text-honey-ink underline">
         Connect it
       </a>{" "}
       to see your events and free gaps.
