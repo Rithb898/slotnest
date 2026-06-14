@@ -2,10 +2,12 @@
 
 import {
   CalendarDays,
+  FileText,
   Inbox,
   Loader2,
   PenLine,
   Plug,
+  Send,
   Sparkles,
   Sun,
 } from "lucide-react";
@@ -57,6 +59,8 @@ const GOTO: Record<string, Route> = {
   t: "/today",
   i: "/inbox",
   c: "/calendar",
+  d: "/drafts",
+  w: "/waiting",
 };
 
 const CommandBarContext = createContext<CommandBarContextValue | null>(null);
@@ -224,6 +228,16 @@ export function CommandBar({ children }: { children?: React.ReactNode }) {
               <span>Calendar</span>
               <CommandShortcut>g c</CommandShortcut>
             </CommandItem>
+            <CommandItem onSelect={() => go("/drafts")}>
+              <FileText />
+              <span>Drafts</span>
+              <CommandShortcut>g d</CommandShortcut>
+            </CommandItem>
+            <CommandItem onSelect={() => go("/waiting")}>
+              <Send />
+              <span>Waiting</span>
+              <CommandShortcut>g w</CommandShortcut>
+            </CommandItem>
             <CommandItem onSelect={() => go("/settings")}>
               <Plug />
               <span>Settings</span>
@@ -231,6 +245,17 @@ export function CommandBar({ children }: { children?: React.ReactNode }) {
           </CommandGroup>
           <CommandSeparator />
           <CommandGroup heading="Actions">
+            {looksLikeSentence ? (
+              <CommandItem
+                value={`proposal ${trimmed}`}
+                onSelect={runAgent}
+                disabled={ask.isPending}
+              >
+                <Sparkles />
+                <span className="truncate">Prepare approval proposal</span>
+                <CommandShortcut>↵</CommandShortcut>
+              </CommandItem>
+            ) : null}
             <CommandItem onSelect={() => go("/inbox")}>
               <PenLine />
               <span>Compose</span>

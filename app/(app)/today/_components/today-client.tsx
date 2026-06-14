@@ -1,8 +1,6 @@
 "use client";
 
-import type { LucideIcon } from "lucide-react";
 import {
-  ArrowRight,
   CalendarDays,
   CheckCircle2,
   Clock3,
@@ -10,6 +8,7 @@ import {
   Inbox,
   Mail,
   MailCheck,
+  PenLine,
   Send,
   ShieldCheck,
   Sparkles,
@@ -17,7 +16,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useCommandBar } from "@/components/command-bar";
 import { InviteDialog, type InviteDraft } from "@/components/invite-dialog";
@@ -34,59 +33,38 @@ import {
   toReplyReferences,
   toReplySubject,
 } from "@/lib/reply";
-import { type Triage, triagePriority } from "@/lib/triage";
+import { triagePriority } from "@/lib/triage";
 import { cn } from "@/lib/utils";
+import {
+  chooseBestSlot,
+  draftActionLabel,
+  draftPreview,
+  followUpDraft,
+  formatShortDate,
+  formatTime,
+  initials,
+  isSchedulingMessage,
+  isWaitingMessage,
+  sameDay,
+  type WorkspaceEvent,
+  type WorkspaceMessage,
+  type WorkspaceSlot,
+  waitingDuration,
+  waitingReason,
+  whyThisMatters,
+} from "@/lib/workspace";
 import { authClient } from "@/server/auth/client";
 import { api } from "@/trpc/react";
 
-/** Soft lift shared by interactive cards (DESIGN: "Quiet Desk"). */
-const CARD_HOVER =
-  "transition-shadow hover:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_2px_8px_rgba(0,0,0,0.06)]";
+type ActionState = "approved" | "skipped" | "snoozed" | "resolved";
 
-type Slot = { start: string; end: string };
+const PROVIDER_CONNECT = {
+  gmail: { label: "Gmail", icon: Mail },
+  googlecalendar: { label: "Google Calendar", icon: CalendarDays },
+} as const;
 
-type TodayMessage = {
-  id: string;
-  threadId: string | null;
-  fromName: string | null;
-  fromEmail: string;
-  subject: string;
-  messageIdHeader: string | null;
-  references: string | null;
-  snippet: string;
-  date: Date | string | null;
-  triage: Triage;
-};
-
-type ActionState = "approved" | "skipped";
-
-function sameDay(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
-}
-
-function fmtTime(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleTimeString(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
-function initials(name: string): string {
-  return (
-    name
-      .split(/\s+/)
-      .map((p) => p[0])
-      .slice(0, 2)
-      .join("")
-      .toUpperCase() || "?"
-  );
+function firstName(name?: string | null): string {
+  return name?.trim().split(/\s+/)[0] ?? "there";
 }
 
 function greetingFor(hour: number): string {
@@ -95,278 +73,143 @@ function greetingFor(hour: number): string {
   return "Good evening";
 }
 
-function firstName(name?: string | null): string {
-  return name?.trim().split(/\s+/)[0] ?? "there";
-}
-
-function replyPreview(input: {
-  subject: string;
-  snippet: string;
-  fromName: string | null;
-  fromEmail: string;
-}): string {
-  const text = `${input.subject} ${input.snippet}`.toLowerCase();
-  const sender = input.fromName || input.fromEmail.split("@")[0] || "them";
-
-  if (
-    text.includes("meet") ||
-    text.includes("call") ||
-    text.includes("available") ||
-    text.includes("schedule")
-  ) {
-    return `SlotNest can suggest a time and draft the reply to ${sender}.`;
-  }
-  if (
-    text.includes("review") ||
-    text.includes("feedback") ||
-    text.includes("thoughts")
-  ) {
-    return `Draft ready: acknowledge it and promise a clear answer.`;
-  }
-  if (
-    text.includes("confirm") ||
-    text.includes("rsvp") ||
-    text.includes("yes")
-  ) {
-    return `Draft ready: confirm politely in one sentence.`;
-  }
-  return `Draft ready: a short reply in your voice.`;
-}
-
-function actionLabel(input: { subject: string; snippet: string }): string {
-  const text = `${input.subject} ${input.snippet}`.toLowerCase();
-  if (
-    text.includes("meet") ||
-    text.includes("call") ||
-    text.includes("available") ||
-    text.includes("schedule")
-  ) {
-    return "Slot found";
-  }
-  if (text.includes("review") || text.includes("feedback")) {
-    return "Review reply";
-  }
-  return "Reply ready";
-}
-
-function isSchedulingEmail(input: {
-  subject: string;
-  snippet: string;
-}): boolean {
-  const text = `${input.subject} ${input.snippet}`.toLowerCase();
-  return [
-    "meet",
-    "meeting",
-    "call",
-    "available",
-    "availability",
-    "schedule",
-    "calendar",
-    "book",
-    "invite",
-  ].some((cue) => text.includes(cue));
-}
-
-function whyThisMatters(input: {
-  subject: string;
-  snippet: string;
-  triage: Triage;
-}): string {
-  const text = `${input.subject} ${input.snippet}`.toLowerCase();
-  if (isSchedulingEmail(input)) return "Scheduling request detected";
-  if (input.triage.urgency === "Urgent") return "Time-sensitive language found";
-  if (text.includes("?")) return "Asked a direct question";
-  if (text.includes("review") || text.includes("feedback")) {
-    return "Waiting for your opinion";
-  }
-  if (text.includes("confirm") || text.includes("rsvp")) {
-    return "Needs your confirmation";
-  }
-  return "Needs a human decision";
-}
-
-function dailySummary({
-  replies,
-  events,
-  openSlots,
-}: {
-  replies: number;
-  events: number;
-  openSlots: number;
-}): string {
-  if (replies === 0 && events === 0) {
-    return "Your inbox and calendar are clear for now.";
-  }
-  if (replies > 0 && openSlots > 0) {
-    return `${replies} ${
-      replies === 1 ? "person needs" : "people need"
-    } a reply, and SlotNest found ${openSlots} useful ${
-      openSlots === 1 ? "slot" : "slots"
-    } today.`;
-  }
-  if (replies > 0) {
-    return `${replies} ${
-      replies === 1 ? "reply is" : "replies are"
-    } waiting. Start with the first prepared action.`;
-  }
-  if (events > 0) {
-    return `Your calendar has ${events} ${
-      events === 1 ? "event" : "events"
-    } today. SlotNest will keep watch for anything that needs you.`;
-  }
-  return "SlotNest is watching for the next thing that needs you.";
-}
-
-function followUpReason(input: { subject: string; snippet: string }): string {
-  const text = `${input.subject} ${input.snippet}`.toLowerCase();
-  if (text.includes("follow up") || text.includes("following up")) {
-    return "Follow-up thread";
-  }
-  if (text.includes("waiting") || text.includes("checking in")) {
-    return "Waiting language detected";
-  }
-  if (text.includes("reminder")) return "Reminder detected";
-  return "May need a later check";
-}
-
-/**
- * /today — the "approve, don't read" home (DESIGN + plan 003).
- *
- * The first screen is an approval queue, not a dashboard: greet the user,
- * summarize what needs them, pick one next action, then show replies, calendar,
- * and a plain-English AI entry point.
- */
 export function TodayClient() {
   const router = useRouter();
   const { data: session } = authClient.useSession();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [actionStates, setActionStates] = useState<Record<string, ActionState>>(
     {},
   );
-  const [inviteOpen, setInviteOpen] = useState(false);
-  const [inviteDraft, setInviteDraft] = useState<InviteDraft | null>(null);
-  const [replyOpen, setReplyOpen] = useState(false);
   const [replyDraft, setReplyDraft] = useState<ReplyDraft | null>(null);
-  const [replyMessageId, setReplyMessageId] = useState<string | null>(null);
-  // `connections.list` is the cheap, never-throwing source of truth for what's
-  // connected. The heavy Gmail/Calendar queries are gated on it, so a brand-new
-  // account never fires (or retries) them — the onboarding screen shows at once.
+  const [replyOpen, setReplyOpen] = useState(false);
+  const [inviteDraft, setInviteDraft] = useState<InviteDraft | null>(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
+
   const connections = api.connections.list.useQuery();
   const gmailConnected = connections.data?.includes("gmail") ?? false;
   const calendarConnected =
     connections.data?.includes("googlecalendar") ?? false;
 
   const inbox = api.gmail.inbox.useQuery(
-    {},
+    { maxResults: 30 },
     { ...INBOX_POLL_OPTIONS, enabled: gmailConnected },
   );
 
-  // Today's calendar window (00:00 → 24:00 local) for zone 2.
   const todayRange = useMemo(() => {
     const start = new Date();
     start.setHours(0, 0, 0, 0);
     const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
     return { timeMin: start.toISOString(), timeMax: end.toISOString() };
   }, []);
+
   const calendar = api.calendar.events.useQuery(todayRange, {
     ...CALENDAR_POLL_OPTIONS,
     enabled: calendarConnected,
   });
   const availability = api.calendar.availability.useQuery(
-    {
-      ...todayRange,
-      minMinutes: 30,
-    },
+    { ...todayRange, minMinutes: 30 },
     { ...CALENDAR_POLL_OPTIONS, enabled: calendarConnected },
   );
 
-  const now = new Date();
-  const dateLabel = now.toLocaleDateString(undefined, {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
-
-  const todayEvents = useMemo(() => {
+  const todayEvents = useMemo<WorkspaceEvent[]>(() => {
     if (!calendar.data || calendar.data.connected === false) return [];
     const today = new Date();
     return calendar.data.events
-      .filter((e) => (e.start ? sameDay(new Date(e.start), today) : false))
+      .filter((event) =>
+        event.start ? sameDay(new Date(event.start), today) : false,
+      )
       .sort((a, b) => (a.start ?? "").localeCompare(b.start ?? ""))
       .slice(0, 6);
   }, [calendar.data]);
 
-  const todaySlots = useMemo(() => {
+  const todaySlots = useMemo<WorkspaceSlot[]>(() => {
     if (!availability.data || availability.data.connected === false) return [];
     const today = new Date();
     return availability.data.slots
-      .filter((s) => sameDay(new Date(s.start), today))
-      .slice(0, 3);
+      .filter((slot) => sameDay(new Date(slot.start), today))
+      .slice(0, 5);
   }, [availability.data]);
 
-  const needsReply = useMemo(() => {
+  const queue = useMemo<WorkspaceMessage[]>(() => {
     if (!inbox.data) return [];
     return inbox.data.messages
-      .filter((m) => m.triage.action === "Needs reply")
-      .filter((m) => actionStates[m.id] !== "skipped")
+      .filter((message) => message.triage.action === "Needs reply")
+      .filter((message) => actionStates[message.id] !== "skipped")
       .sort((a, b) => triagePriority(b.triage) - triagePriority(a.triage))
-      .slice(0, 5);
+      .slice(0, 8);
   }, [inbox.data, actionStates]);
 
-  const waitingOnOthers = useMemo(() => {
+  const waiting = useMemo<WorkspaceMessage[]>(() => {
     if (!inbox.data) return [];
-    return inbox.data.messages
-      .filter((m) => m.triage.action !== "Needs reply")
-      .filter((m) => {
-        const text = `${m.subject} ${m.snippet}`.toLowerCase();
-        return (
-          text.includes("follow up") ||
-          text.includes("following up") ||
-          text.includes("waiting") ||
-          text.includes("checking in") ||
-          text.includes("reminder")
-        );
-      })
-      .slice(0, 3);
+    return inbox.data.messages.filter(isWaitingMessage).slice(0, 4);
   }, [inbox.data]);
 
-  const nextAction = needsReply[0] ?? null;
-  const preparedCount = needsReply.length;
-  const firstSlot = todaySlots[0] ?? null;
+  useEffect(() => {
+    if (queue.length === 0) {
+      setSelectedId(null);
+      return;
+    }
+    if (!selectedId || !queue.some((item) => item.id === selectedId)) {
+      setSelectedId(queue[0]?.id ?? null);
+    }
+  }, [queue, selectedId]);
 
-  // Once `connections.list` has loaded we can decide the first-run experience
-  // immediately — no need to wait on the gated Gmail/Calendar queries.
-  const connectionsReady = !connections.isPending;
+  const selected = queue.find((item) => item.id === selectedId) ?? queue[0];
+  const bestSlot = chooseBestSlot(todaySlots);
+  const nextEvent = todayEvents[0] ?? null;
+  const now = new Date();
+
+  const briefInput = useMemo(
+    () => ({
+      needsReply: queue.length,
+      draftCount: queue.length,
+      waitingCount: waiting.length,
+      eventCount: todayEvents.length,
+      openSlotCount: todaySlots.length,
+      bestSlot: bestSlot ? formatTime(bestSlot.start) : null,
+      topMessages: queue.slice(0, 3).map((message) => ({
+        sender: message.fromName || message.fromEmail,
+        subject: message.subject,
+        reason: whyThisMatters(message),
+      })),
+      nextEvent: nextEvent
+        ? { summary: nextEvent.summary, time: formatTime(nextEvent.start) }
+        : null,
+    }),
+    [
+      queue,
+      waiting.length,
+      todayEvents.length,
+      todaySlots.length,
+      bestSlot,
+      nextEvent,
+    ],
+  );
+
+  const brief = api.workspace.dailyBrief.useQuery(briefInput, {
+    enabled:
+      connections.isSuccess &&
+      (!gmailConnected || inbox.isSuccess) &&
+      (!calendarConnected || calendar.isSuccess),
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+
   const noneConnected =
-    connectionsReady && !gmailConnected && !calendarConnected;
+    !connections.isPending && !gmailConnected && !calendarConnected;
   const someDisconnected =
-    connectionsReady && (!gmailConnected || !calendarConnected);
+    !connections.isPending && (!gmailConnected || !calendarConnected);
 
   function setAction(id: string, state: ActionState) {
     setActionStates((current) => ({ ...current, [id]: state }));
   }
 
-  function openInviteFromMessage(message: TodayMessage, slot?: Slot | null) {
-    const defaultStart = slot?.start;
-    const defaultEnd = slot?.end;
-    setInviteDraft({
-      summary: cleanReplySubject(message.subject, "Meeting"),
-      start: defaultStart,
-      end: defaultEnd,
-      attendees: [message.fromEmail],
-      description: `From ${message.fromName || message.fromEmail}: ${
-        message.snippet
-      }`,
-    });
-    setInviteOpen(true);
-  }
-
-  function openReplyFromMessage(message: TodayMessage) {
+  function openReply(message: WorkspaceMessage, body = "") {
     if (!message.threadId) return;
-    setReplyMessageId(message.id);
     setReplyDraft({
       to: message.fromEmail,
       subject: toReplySubject(message.subject),
-      body: "",
+      body,
       messageId: message.id,
       threadId: message.threadId,
       inReplyTo: message.messageIdHeader,
@@ -378,254 +221,508 @@ export function TodayClient() {
     setReplyOpen(true);
   }
 
+  function openInvite(message: WorkspaceMessage, slot?: WorkspaceSlot | null) {
+    setInviteDraft({
+      summary: cleanReplySubject(message.subject, "Meeting"),
+      start: slot?.start,
+      end: slot?.end,
+      attendees: [message.fromEmail],
+      description: `From ${message.fromName || message.fromEmail}: ${
+        message.snippet
+      }`,
+    });
+    setInviteOpen(true);
+  }
+
   return (
     <div className="min-h-full bg-background pb-16 md:pb-0">
-      {/* Sticky header keeps context while the list scrolls. The content is
-       * centered and capped; the app shell itself remains full-screen. */}
-      <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-7xl items-end justify-between gap-4 px-5 py-5 sm:px-6 lg:px-10">
-          <div className="flex flex-col gap-1">
-            <h1
-              className="text-2xl font-semibold tracking-tight sm:text-3xl"
-              suppressHydrationWarning
-            >
+      <header className="sticky top-0 z-10 border-b border-border bg-background/90 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-5 py-4 sm:px-6 lg:px-8">
+          <div className="min-w-0">
+            <h1 className="truncate text-xl font-semibold tracking-tight sm:text-2xl">
               {greetingFor(now.getHours())}, {firstName(session?.user.name)}
             </h1>
-            <p
-              className="text-sm text-muted-foreground"
-              suppressHydrationWarning
-            >
-              {dateLabel}.{" "}
-              {connections.isPending || inbox.isLoading || calendar.isLoading
-                ? "SlotNest is checking what needs you."
-                : noneConnected
-                  ? "Connect Gmail and Calendar to begin."
-                  : dailySummary({
-                      replies: needsReply.length,
-                      events: todayEvents.length,
-                      openSlots: todaySlots.length,
-                    })}
+            <p className="mt-1 text-sm text-muted-foreground">
+              {now.toLocaleDateString(undefined, {
+                weekday: "long",
+                month: "long",
+                day: "numeric",
+              })}
             </p>
           </div>
           <HeaderAsk />
         </div>
       </header>
 
-      {/* Full-screen workspace, constrained like an app canvas instead of a
-       * full-width document. The queue stays the primary column; calendar and
-       * Ask sit in a stable right rail. */}
       {noneConnected ? (
         <OnboardingHero firstName={firstName(session?.user.name)} />
       ) : (
-        <div className="mx-auto grid w-full max-w-7xl gap-7 px-5 py-7 sm:px-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-10 lg:px-10 xl:grid-cols-[minmax(720px,1fr)_400px]">
-          {/* Left column — Needs your reply (the primary zone) */}
-          <section className="flex flex-col gap-6">
+        <div className="mx-auto grid w-full max-w-7xl gap-5 px-5 py-5 sm:px-6 lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)_300px] lg:px-8">
+          <section className="lg:col-span-3">
             {someDisconnected ? (
               <ConnectFirstState
                 gmailConnected={gmailConnected}
                 calendarConnected={calendarConnected}
               />
             ) : null}
+          </section>
 
-            <BriefStrip
-              replies={needsReply.length}
-              prepared={preparedCount}
-              openSlots={todaySlots.length}
-            />
-
-            {nextAction ? (
-              <NextActionCard
-                message={nextAction}
-                slot={firstSlot}
-                state={actionStates[nextAction.id]}
-                onApprove={() => openReplyFromMessage(nextAction)}
-                onEdit={() => router.push("/inbox")}
-                onSkip={() => setAction(nextAction.id, "skipped")}
-                onInvite={() => openInviteFromMessage(nextAction, firstSlot)}
-              />
-            ) : null}
-
-            <div className="flex flex-col gap-3">
-              <SectionHeader icon={Inbox} count={needsReply.length}>
-                Needs your reply
-              </SectionHeader>
-              {connections.isPending || inbox.isLoading ? (
-                <ZoneSkeleton />
-              ) : inbox.isError || !inbox.data ? (
-                <EmptyState icon={Inbox}>
-                  Couldn&apos;t load your inbox.{" "}
-                  <button
-                    type="button"
-                    className="text-[var(--honey-ink)] underline"
-                    onClick={() => router.push("/settings?tab=connections")}
-                  >
-                    Is Gmail connected?
-                  </button>
-                </EmptyState>
-              ) : needsReply.length === 0 ? (
-                <DoneForNowState />
-              ) : (
-                <ul className="flex flex-col gap-2">
-                  {needsReply.map((m) => (
-                    <li key={m.id}>
-                      <ReplyDecisionRow
-                        message={m}
-                        slot={firstSlot}
-                        state={actionStates[m.id]}
-                        onOpen={() => router.push("/inbox")}
-                        onApprove={() => openReplyFromMessage(m)}
-                        onSkip={() => setAction(m.id, "skipped")}
-                        onInvite={() => openInviteFromMessage(m, firstSlot)}
-                      />
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            <WaitingOnOthers
-              items={waitingOnOthers}
-              onOpen={() => router.push("/inbox")}
+          <section className="lg:col-span-3">
+            <DailyBrief
+              loading={brief.isLoading || connections.isPending}
+              text={
+                brief.data?.brief ??
+                "SlotNest is checking Gmail and Calendar for what needs approval."
+              }
+              highlights={brief.data?.highlights ?? []}
             />
           </section>
 
-          {/* Right rail — calendar + the Ask CTA, stacked. */}
-          <div className="flex flex-col gap-7 lg:pt-[3.875rem]">
-            {/* Zone 2 — On your calendar today (lighter, grouped timeline) */}
-            <section className="flex flex-col gap-3">
-              <SectionHeader icon={CalendarDays} count={todayEvents.length}>
-                On your calendar today
-              </SectionHeader>
-              {connections.isPending || calendar.isLoading ? (
-                <ZoneSkeleton />
-              ) : calendarConnected === false ? (
-                <EmptyState icon={CalendarDays}>
-                  Calendar isn&apos;t connected yet.{" "}
-                  <button
-                    type="button"
-                    className="text-[var(--honey-ink)] underline"
-                    onClick={() => router.push("/settings?tab=connections")}
-                  >
-                    Connect Google Calendar
-                  </button>{" "}
-                  to see today&apos;s events and free gaps.
-                </EmptyState>
-              ) : todayEvents.length === 0 ? (
-                <div className="flex flex-col gap-2">
-                  <EmptyState icon={Sun}>
-                    Nothing on your calendar today. Clear runway.
-                  </EmptyState>
-                  <OpenSlots
-                    slots={todaySlots}
-                    onOpen={() => router.push("/calendar")}
-                  />
-                </div>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
-                    {todayEvents.slice(0, 4).map((e) => (
-                      <li key={e.id}>
-                        <button
-                          type="button"
-                          onClick={() => router.push("/calendar")}
-                          className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent"
-                        >
-                          <span className="w-16 shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
-                            {e.allDay ? "All day" : fmtTime(e.start)}
-                          </span>
-                          <span className="min-w-0 flex-1 truncate text-[0.9375rem] font-medium">
-                            {e.summary}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                  <OpenSlots
-                    slots={todaySlots}
-                    onOpen={() => router.push("/calendar")}
-                  />
-                </div>
-              )}
-            </section>
+          <section className="min-h-0 rounded-xl border border-border bg-card">
+            <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+              <SectionTitle icon={Inbox}>Prioritized</SectionTitle>
+              <span className="font-mono text-xs text-muted-foreground">
+                {queue.length}
+              </span>
+            </div>
+            {connections.isPending || inbox.isLoading ? (
+              <QueueSkeleton />
+            ) : inbox.isError || !inbox.data ? (
+              <PanelEmpty icon={Inbox}>
+                Couldn&apos;t load Gmail. Check the connection in settings.
+              </PanelEmpty>
+            ) : queue.length === 0 ? (
+              <PanelEmpty icon={CheckCircle2}>
+                No approvals waiting. SlotNest will bring the next decision
+                here.
+              </PanelEmpty>
+            ) : (
+              <ul className="max-h-[calc(100svh-18rem)] overflow-y-auto p-2">
+                {queue.map((message) => (
+                  <li key={message.id}>
+                    <QueueRow
+                      message={message}
+                      active={message.id === selected?.id}
+                      state={actionStates[message.id]}
+                      onSelect={() => setSelectedId(message.id)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
 
-            {/* Zone 3 — Ask SlotNest (the page's single honey accent) */}
-            <AskSlotNest
-              replies={needsReply.length}
-              openSlots={todaySlots.length}
+          <section className="min-h-[520px] rounded-xl border border-border bg-card">
+            {selected ? (
+              <DecisionPanel
+                message={selected}
+                slot={bestSlot}
+                state={actionStates[selected.id]}
+                onApprove={() => openReply(selected)}
+                onEdit={() => openReply(selected)}
+                onSkip={() => setAction(selected.id, "skipped")}
+                onSnooze={() => setAction(selected.id, "snoozed")}
+                onInvite={() => openInvite(selected, bestSlot)}
+                onOpenInbox={() => router.push("/inbox")}
+              />
+            ) : (
+              <PanelEmpty icon={Sun}>
+                You&apos;re clear for now. This panel becomes the approval card
+                when an email needs a reply or meeting slot.
+              </PanelEmpty>
+            )}
+          </section>
+
+          <aside className="flex flex-col gap-4">
+            <CalendarRail
+              events={todayEvents}
+              slots={todaySlots}
+              loading={calendar.isLoading || availability.isLoading}
+              connected={calendarConnected}
+              onOpenCalendar={() => router.push("/calendar")}
             />
-          </div>
+            <WaitingRail
+              items={waiting}
+              onOpen={() => router.push("/waiting")}
+              onFollowUp={(message) =>
+                openReply(message, followUpDraft(message))
+              }
+              onSnooze={(message) => setAction(message.id, "snoozed")}
+              onResolved={(message) => setAction(message.id, "resolved")}
+            />
+          </aside>
         </div>
       )}
 
+      <ReplyDialog
+        open={replyOpen}
+        onOpenChange={setReplyOpen}
+        draft={replyDraft}
+        onSent={() => replyDraft && setAction(replyDraft.messageId, "approved")}
+      />
       <InviteDialog
         open={inviteOpen}
         onOpenChange={setInviteOpen}
         draft={inviteDraft}
       />
-      <ReplyDialog
-        open={replyOpen}
-        onOpenChange={setReplyOpen}
-        draft={replyDraft}
-        onSent={() => {
-          if (replyMessageId) setAction(replyMessageId, "approved");
-        }}
-      />
     </div>
   );
 }
 
-function BriefStrip({
-  replies,
-  prepared,
-  openSlots,
+function DailyBrief({
+  loading,
+  text,
+  highlights,
 }: {
-  replies: number;
-  prepared: number;
-  openSlots: number;
+  loading: boolean;
+  text: string;
+  highlights: string[];
 }) {
   return (
-    <div className="grid gap-2 rounded-xl border border-border bg-card p-2 sm:grid-cols-3">
-      <BriefItem icon={MailCheck} label="Replies waiting" value={replies} />
-      <BriefItem icon={Sparkles} label="Prepared actions" value={prepared} />
-      <BriefItem icon={Clock3} label="Open slots today" value={openSlots} />
-    </div>
-  );
-}
-
-function BriefItem({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: number;
-}) {
-  return (
-    <div className="flex min-w-0 items-center gap-3 rounded-lg px-3 py-2.5">
-      <Icon className="size-4 shrink-0 text-muted-foreground" />
-      <div className="min-w-0">
-        <div className="text-base font-semibold leading-none tabular-nums">
-          {value}
-        </div>
-        <div className="mt-1 truncate text-xs text-muted-foreground">
-          {label}
+    <div className="rounded-xl border border-border bg-card px-4 py-4 sm:px-5">
+      <div className="flex items-start gap-3">
+        <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-[var(--honey-ink)]">
+          <Sparkles className="size-4" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="mb-1 flex items-center gap-2 text-sm font-semibold">
+            AI daily brief
+            {loading ? (
+              <span className="text-xs font-normal text-muted-foreground">
+                updating
+              </span>
+            ) : null}
+          </div>
+          {loading ? (
+            <Skeleton className="h-5 max-w-3xl" />
+          ) : (
+            <p className="max-w-4xl text-[0.9375rem] leading-6 text-foreground">
+              {text}
+            </p>
+          )}
+          {highlights.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {highlights.map((highlight) => (
+                <span
+                  key={highlight}
+                  className="rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground"
+                >
+                  {highlight}
+                </span>
+              ))}
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
   );
 }
 
-const PROVIDER_CONNECT = {
-  gmail: { label: "Gmail", icon: Mail },
-  googlecalendar: { label: "Google Calendar", icon: CalendarDays },
-} as const;
+function QueueRow({
+  message,
+  active,
+  state,
+  onSelect,
+}: {
+  message: WorkspaceMessage;
+  active: boolean;
+  state?: ActionState;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        "relative flex w-full gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-accent",
+        active && "bg-accent text-accent-foreground",
+      )}
+    >
+      {active ? (
+        <span
+          className="absolute left-0 top-1/2 h-7 w-0.5 -translate-y-1/2 rounded-full bg-primary"
+          aria-hidden
+        />
+      ) : null}
+      <Avatar className="size-8 shrink-0">
+        <AvatarFallback className="bg-primary/15 text-xs font-semibold text-[var(--honey-ink)]">
+          {initials(message.fromName || message.fromEmail)}
+        </AvatarFallback>
+      </Avatar>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center justify-between gap-2">
+          <span className="truncate text-sm font-semibold">
+            {message.fromName || message.fromEmail}
+          </span>
+          <span className="shrink-0 font-mono text-xs text-muted-foreground">
+            {formatShortDate(message.date)}
+          </span>
+        </span>
+        <span className="mt-0.5 block truncate text-sm text-muted-foreground">
+          {message.subject}
+        </span>
+        <span className="mt-2 flex flex-wrap items-center gap-1.5">
+          <TriageChips
+            action={message.triage.action}
+            urgency={message.triage.urgency}
+          />
+          <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
+            {state === "snoozed" ? "Snoozed" : draftActionLabel(message)}
+          </span>
+        </span>
+      </span>
+    </button>
+  );
+}
 
-/**
- * Inline banner for the PARTIAL case — one of Gmail/Calendar is connected and
- * the other isn't. Sits above the queue and links straight to OAuth for the
- * missing side (no detour through /settings).
- */
+function DecisionPanel({
+  message,
+  slot,
+  state,
+  onApprove,
+  onEdit,
+  onSkip,
+  onSnooze,
+  onInvite,
+  onOpenInbox,
+}: {
+  message: WorkspaceMessage;
+  slot: WorkspaceSlot | null;
+  state?: ActionState;
+  onApprove: () => void;
+  onEdit: () => void;
+  onSkip: () => void;
+  onSnooze: () => void;
+  onInvite: () => void;
+  onOpenInbox: () => void;
+}) {
+  const scheduling = isSchedulingMessage(message);
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="border-b border-border px-5 py-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <TriageChips
+            action={message.triage.action}
+            urgency={message.triage.urgency}
+          />
+          <span className="rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
+            {draftActionLabel(message)}
+          </span>
+        </div>
+        <h2 className="mt-3 text-xl font-semibold tracking-tight">
+          {message.subject}
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {message.fromName || message.fromEmail} ·{" "}
+          {formatShortDate(message.date)}
+        </p>
+      </div>
+
+      <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
+        <section>
+          <SectionTitle icon={HelpCircle}>Why SlotNest picked it</SectionTitle>
+          <p className="mt-2 rounded-lg bg-muted px-3 py-2 text-sm leading-6">
+            {whyThisMatters(message)}. {message.snippet}
+          </p>
+        </section>
+
+        <section>
+          <SectionTitle icon={PenLine}>Prepared reply</SectionTitle>
+          <div className="mt-2 rounded-lg border border-border bg-background px-3 py-3 text-sm leading-6">
+            {draftPreview(message)}
+          </div>
+        </section>
+
+        {scheduling ? (
+          <section>
+            <SectionTitle icon={CalendarDays}>Calendar suggestion</SectionTitle>
+            <div className="mt-2 rounded-lg border border-border bg-background px-3 py-3 text-sm">
+              {slot ? (
+                <div className="flex items-center justify-between gap-3">
+                  <span>
+                    {formatTime(slot.start)} - {formatTime(slot.end)} is open
+                    today.
+                  </span>
+                  <Button variant="secondary" size="sm" onClick={onInvite}>
+                    Draft invite
+                  </Button>
+                </div>
+              ) : (
+                "No open slot found today. Draft a reply asking for options."
+              )}
+            </div>
+          </section>
+        ) : null}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 border-t border-border px-5 py-3">
+        <span className="mr-auto text-xs font-medium text-muted-foreground">
+          {state === "approved" ? "Approved" : "Review before anything sends"}
+        </span>
+        <Button variant="ghost" size="sm" onClick={onOpenInbox}>
+          Read
+        </Button>
+        <Button variant="ghost" size="sm" onClick={onSnooze}>
+          Snooze
+        </Button>
+        <Button variant="ghost" size="sm" onClick={onSkip}>
+          Skip
+        </Button>
+        <Button variant="secondary" size="sm" onClick={onEdit}>
+          Edit
+        </Button>
+        <Button size="sm" onClick={onApprove} disabled={state === "approved"}>
+          <CheckCircle2 className="size-4" />
+          Approve
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function CalendarRail({
+  events,
+  slots,
+  loading,
+  connected,
+  onOpenCalendar,
+}: {
+  events: WorkspaceEvent[];
+  slots: WorkspaceSlot[];
+  loading: boolean;
+  connected: boolean;
+  onOpenCalendar: () => void;
+}) {
+  return (
+    <section className="rounded-xl border border-border bg-card">
+      <div className="flex items-center justify-between border-b border-border px-4 py-3">
+        <SectionTitle icon={CalendarDays}>Today</SectionTitle>
+        <button
+          type="button"
+          onClick={onOpenCalendar}
+          className="text-xs font-medium text-muted-foreground hover:text-foreground"
+        >
+          Calendar
+        </button>
+      </div>
+      <div className="space-y-3 p-4">
+        {!connected ? (
+          <PanelEmpty icon={CalendarDays}>
+            Connect Calendar for event context and real open slots.
+          </PanelEmpty>
+        ) : loading ? (
+          <QueueSkeleton compact />
+        ) : (
+          <>
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">
+                Next event
+              </p>
+              <p className="mt-1 truncate text-sm font-semibold">
+                {events[0]?.summary ?? "No more events today"}
+              </p>
+              {events[0] ? (
+                <p className="text-xs text-muted-foreground">
+                  {events[0].allDay ? "All day" : formatTime(events[0].start)}
+                </p>
+              ) : null}
+            </div>
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">
+                Best open slot
+              </p>
+              {slots[0] ? (
+                <button
+                  type="button"
+                  onClick={onOpenCalendar}
+                  className="mt-1 flex w-full items-center justify-between rounded-lg bg-muted px-3 py-2 text-left text-sm"
+                >
+                  <span>
+                    {formatTime(slots[0].start)} - {formatTime(slots[0].end)}
+                  </span>
+                  <Clock3 className="size-4 text-muted-foreground" />
+                </button>
+              ) : (
+                <p className="mt-1 text-sm text-muted-foreground">
+                  No open slot in working hours.
+                </p>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function WaitingRail({
+  items,
+  onOpen,
+  onFollowUp,
+  onSnooze,
+  onResolved,
+}: {
+  items: WorkspaceMessage[];
+  onOpen: () => void;
+  onFollowUp: (message: WorkspaceMessage) => void;
+  onSnooze: (message: WorkspaceMessage) => void;
+  onResolved: (message: WorkspaceMessage) => void;
+}) {
+  return (
+    <section className="rounded-xl border border-border bg-card">
+      <div className="flex items-center justify-between border-b border-border px-4 py-3">
+        <SectionTitle icon={Send}>Waiting</SectionTitle>
+        <button
+          type="button"
+          onClick={onOpen}
+          className="text-xs font-medium text-muted-foreground hover:text-foreground"
+        >
+          View all
+        </button>
+      </div>
+      {items.length === 0 ? (
+        <PanelEmpty icon={CheckCircle2}>
+          No follow-ups detected from current Gmail context.
+        </PanelEmpty>
+      ) : (
+        <ul className="divide-y divide-border">
+          {items.slice(0, 3).map((item) => (
+            <li key={item.id} className="px-4 py-3">
+              <p className="truncate text-sm font-semibold">{item.subject}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {waitingReason(item)} · {waitingDuration(item.date)}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <Button
+                  size="xs"
+                  variant="secondary"
+                  onClick={() => onFollowUp(item)}
+                >
+                  Follow up
+                </Button>
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  onClick={() => onSnooze(item)}
+                >
+                  Snooze
+                </Button>
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  onClick={() => onResolved(item)}
+                >
+                  Resolved
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 function ConnectFirstState({
   gmailConnected,
   calendarConnected,
@@ -641,47 +738,34 @@ function ConnectFirstState({
   ).map((key) => ({ key, ...PROVIDER_CONNECT[key] }));
 
   if (missing.length === 0) return null;
-  const which = missing.map((m) => m.label).join(" and ");
 
   return (
-    <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-[var(--honey-ink)]">
-          <Sparkles className="size-5" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <h2 className="text-base font-semibold">
-            Connect {which} to see everything
-          </h2>
-          <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-            SlotNest works best with both sides of your day — what needs a reply
-            and the open time that can solve scheduling.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {missing.map((m) => {
-              const Icon = m.icon;
-              return (
-                <Link
-                  key={m.key}
-                  href={`/api/corsair/connect?plugin=${m.key}`}
-                  className={cn(buttonVariants({ size: "sm" }))}
-                >
-                  <Icon className="size-3.5" />
-                  Connect {m.label}
-                </Link>
-              );
-            })}
-          </div>
+    <div className="rounded-xl border border-border bg-card px-4 py-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-muted-foreground">
+          Connect {missing.map((m) => m.label).join(" and ")} to complete the
+          daily workspace.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {missing.map((m) => {
+            const Icon = m.icon;
+            return (
+              <Link
+                key={m.key}
+                href={`/api/corsair/connect?plugin=${m.key}`}
+                className={buttonVariants({ size: "sm" })}
+              >
+                <Icon className="size-3.5" />
+                Connect {m.label}
+              </Link>
+            );
+          })}
         </div>
       </div>
-    </section>
+    </div>
   );
 }
 
-/**
- * First-run hero shown when NOTHING is connected — replaces the empty queue so a
- * brand-new account lands on a clear, inviting next step instead of blank zones.
- */
 function OnboardingHero({ firstName }: { firstName: string }) {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col px-5 py-8 sm:px-6 lg:px-10">
@@ -695,401 +779,43 @@ function OnboardingHero({ firstName }: { firstName: string }) {
               Welcome to SlotNest, {firstName}
             </h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Type what you want done. SlotNest finds the calendar slot, drafts
-              the email, and waits for your approval before anything is sent.
+              Connect Gmail and Calendar. SlotNest will surface decisions,
+              prepare replies, find slots, and wait for approval.
             </p>
           </div>
-
-          {/* One click -> Gmail OAuth, then straight into Calendar OAuth. */}
           <Link
             href="/api/corsair/connect?plugin=gmail&next=googlecalendar"
-            className={cn(
-              buttonVariants({ size: "lg" }),
-              "w-full shrink-0 sm:w-auto",
-            )}
+            className={cn(buttonVariants({ size: "lg" }), "w-full sm:w-auto")}
           >
             <Sparkles className="size-4" />
             Connect Google
           </Link>
         </div>
-
-        <div className="mt-6 overflow-hidden rounded-xl border border-border bg-background">
-          <div className="border-b border-border bg-muted px-4 py-3">
-            <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-left">
-              <Sparkles className="size-4 shrink-0 text-[var(--honey-ink)]" />
-              <p className="min-w-0 flex-1 text-sm text-foreground">
-                Send a calendar invite to Sam at 9 AM Thursday and email him
-                that I&apos;m looking forward to our meeting.
-              </p>
-              <Kbd className="hidden sm:inline-flex">↵</Kbd>
-            </div>
-          </div>
-
-          <div className="divide-y divide-border">
-            <CommandPreviewStep
-              icon={CalendarDays}
-              title="Finds real free time"
-              description="Checks Google Calendar and prepares the meeting slot."
-            />
-            <CommandPreviewStep
-              icon={MailCheck}
-              title="Writes the email"
-              description="Drafts the note in plain language, ready to send."
-            />
-            <CommandPreviewStep
-              icon={CheckCircle2}
-              title="Waits for approval"
-              description="Nothing books or sends until you confirm."
-            />
-          </div>
-        </div>
-
-        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-            <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1">
-              <Mail className="size-3.5" />
-              Gmail
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1">
-              <CalendarDays className="size-3.5" />
-              Google Calendar
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1">
-              <ShieldCheck className="size-3.5" />
-              Approve before send
-            </span>
-          </div>
-
-          <Link
-            href="/settings?tab=connections"
-            className={cn(
-              buttonVariants({ variant: "ghost", size: "sm" }),
-              "self-start text-muted-foreground sm:self-auto",
-            )}
-          >
-            Manage connections
-          </Link>
+        <div className="mt-6 divide-y divide-border overflow-hidden rounded-xl border border-border bg-background">
+          <PreviewStep icon={Inbox} title="Finds what needs you" />
+          <PreviewStep icon={MailCheck} title="Prepares the reply" />
+          <PreviewStep icon={ShieldCheck} title="Waits for approval" />
         </div>
       </section>
     </div>
   );
 }
 
-function CommandPreviewStep({
+function PreviewStep({
   icon: Icon,
   title,
-  description,
 }: {
-  icon: LucideIcon;
+  icon: typeof Inbox;
   title: string;
-  description: string;
 }) {
   return (
-    <div className="flex items-start gap-3 px-4 py-3.5">
-      <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-        <Icon className="size-4" />
-      </span>
-      <span className="min-w-0">
-        <span className="block text-sm font-semibold">{title}</span>
-        <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">
-          {description}
-        </span>
-      </span>
-    </div>
-  );
-}
-
-function NextActionCard({
-  message,
-  slot,
-  state,
-  onApprove,
-  onEdit,
-  onSkip,
-  onInvite,
-}: {
-  message: TodayMessage;
-  slot: Slot | null;
-  state?: ActionState;
-  onApprove: () => void;
-  onEdit: () => void;
-  onSkip: () => void;
-  onInvite: () => void;
-}) {
-  const scheduling = isSchedulingEmail(message);
-
-  return (
-    <section className="flex flex-col gap-3">
-      <SectionHeader icon={Sparkles}>Next best action</SectionHeader>
-      <div
-        className={cn(
-          "rounded-xl border border-primary/35 bg-primary/5 p-5 md:p-6",
-          state === "approved" && "border-success/40 bg-success-subtle/45",
-        )}
-      >
-        <div className="flex gap-4">
-          <Avatar className="size-11 shrink-0">
-            <AvatarFallback className="bg-primary/20 text-xs font-semibold text-[var(--honey-ink)]">
-              {initials(message.fromName || message.fromEmail)}
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-base font-semibold">
-                {message.fromName || message.fromEmail}
-              </span>
-              <TriageChips
-                action={message.triage.action}
-                urgency={message.triage.urgency}
-              />
-            </div>
-            <p className="mt-1 text-[0.9375rem] font-medium leading-6">
-              {message.subject}
-            </p>
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              {replyPreview(message)}
-            </p>
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <span className="inline-flex items-center gap-1 rounded-md bg-background/70 px-2 py-1">
-                <HelpCircle className="size-3.5" />
-                {whyThisMatters(message)}
-              </span>
-              {scheduling && slot ? (
-                <span className="inline-flex items-center gap-1 rounded-md bg-background/70 px-2 py-1">
-                  <Clock3 className="size-3.5" />
-                  Best slot: {fmtTime(slot.start)}
-                </span>
-              ) : null}
-            </div>
-            <div className="mt-5 flex flex-wrap items-center gap-2">
-              <span className="mr-auto rounded-md bg-background/75 px-2 py-1 text-xs font-medium text-[var(--honey-ink)]">
-                {state === "approved" ? "Reply approved" : actionLabel(message)}
-              </span>
-              {scheduling && slot ? (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={onInvite}
-                >
-                  <CalendarDays className="size-3.5" />
-                  Draft invite
-                </Button>
-              ) : null}
-              <Button
-                type="button"
-                size="sm"
-                onClick={onApprove}
-                disabled={state === "approved"}
-                className="min-w-24"
-              >
-                <CheckCircle2 className="size-3.5" />
-                Approve
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={onEdit}
-              >
-                Edit
-              </Button>
-              <Button type="button" variant="ghost" size="sm" onClick={onSkip}>
-                Skip
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function ReplyDecisionRow({
-  message,
-  slot,
-  state,
-  onOpen,
-  onApprove,
-  onSkip,
-  onInvite,
-}: {
-  message: TodayMessage;
-  slot: Slot | null;
-  state?: ActionState;
-  onOpen: () => void;
-  onApprove: () => void;
-  onSkip: () => void;
-  onInvite: () => void;
-}) {
-  const scheduling = isSchedulingEmail(message);
-
-  return (
-    <div
-      className={cn(
-        "group flex w-full gap-3 rounded-xl border border-border bg-card p-4 text-left",
-        CARD_HOVER,
-        state === "approved" && "border-success/40 bg-success-subtle/30",
-      )}
-    >
-      <Avatar className="size-9 shrink-0">
-        <AvatarFallback className="bg-primary/15 text-xs font-semibold text-[var(--honey-ink)]">
-          {initials(message.fromName || message.fromEmail)}
-        </AvatarFallback>
-      </Avatar>
-      <div className="flex min-w-0 flex-1 flex-col gap-2">
-        <button
-          type="button"
-          onClick={onOpen}
-          className="flex min-w-0 flex-col gap-1 text-left"
-        >
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="truncate text-[0.9375rem] font-semibold">
-              {message.fromName || message.fromEmail}
-            </span>
-            <TriageChips
-              action={message.triage.action}
-              urgency={message.triage.urgency}
-            />
-          </div>
-          <span className="truncate text-sm text-muted-foreground">
-            {message.subject}
-          </span>
-          <span className="min-w-0 truncate text-xs text-muted-foreground">
-            {replyPreview(message)}
-          </span>
-        </button>
-
-        <div className="flex flex-wrap items-center gap-2 pt-1 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 font-medium text-foreground/70">
-            <HelpCircle className="size-3.5" />
-            {whyThisMatters(message)}
-          </span>
-          {scheduling && slot ? (
-            <span className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 font-medium text-foreground/70">
-              <Clock3 className="size-3.5" />
-              {fmtTime(slot.start)} works
-            </span>
-          ) : null}
-          <span className="rounded-md bg-muted px-1.5 py-0.5 font-medium text-foreground/70">
-            {state === "approved" ? "Reply approved" : actionLabel(message)}
-          </span>
-          <span className="ml-auto flex flex-wrap items-center justify-end gap-2">
-            {scheduling && slot ? (
-              <Button
-                type="button"
-                variant="secondary"
-                size="xs"
-                onClick={onInvite}
-              >
-                <CalendarDays className="size-3" />
-                Invite
-              </Button>
-            ) : null}
-            <Button
-              type="button"
-              size="xs"
-              onClick={onApprove}
-              disabled={state === "approved"}
-            >
-              <CheckCircle2 className="size-3" />
-              Approve
-            </Button>
-            <Button type="button" variant="ghost" size="xs" onClick={onSkip}>
-              Skip
-            </Button>
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function WaitingOnOthers({
-  items,
-  onOpen,
-}: {
-  items: TodayMessage[];
-  onOpen: () => void;
-}) {
-  return (
-    <section className="flex flex-col gap-3">
-      <SectionHeader icon={Send} count={items.length}>
-        Waiting on others
-      </SectionHeader>
-      {items.length === 0 ? (
-        <EmptyState icon={CheckCircle2}>
-          No follow-ups detected. SlotNest will surface threads that look like
-          they are waiting on someone else.
-        </EmptyState>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {items.map((item) => (
-            <li key={item.id}>
-              <button
-                type="button"
-                onClick={onOpen}
-                className={cn(
-                  "flex w-full items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-left",
-                  CARD_HOVER,
-                )}
-              >
-                <Avatar className="size-8 shrink-0">
-                  <AvatarFallback className="bg-muted text-xs font-semibold text-muted-foreground">
-                    {initials(item.fromName || item.fromEmail)}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium">
-                    {item.subject}
-                  </span>
-                  <span className="block truncate text-xs text-muted-foreground">
-                    {followUpReason(item)}
-                  </span>
-                </span>
-                <ArrowRight className="size-4 text-muted-foreground" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-function DoneForNowState() {
-  return (
-    <EmptyState icon={CheckCircle2}>
-      You&apos;re clear for now. SlotNest will surface the next email that needs
-      a reply, a follow-up, or calendar time.
-    </EmptyState>
-  );
-}
-
-function SectionHeader({
-  icon: Icon,
-  count,
-  children,
-}: {
-  icon: LucideIcon;
-  count?: number;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-3 px-4 py-3">
       <Icon className="size-4 text-muted-foreground" />
-      <h2 className="text-sm font-semibold tracking-tight">{children}</h2>
-      {typeof count === "number" && count > 0 ? (
-        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1.5 text-xs font-medium tabular-nums text-muted-foreground">
-          {count}
-        </span>
-      ) : null}
+      <span className="text-sm font-medium">{title}</span>
     </div>
   );
 }
 
-/** Compact ⌘K affordance in the page header — fills the header's right edge
- * and gives the calm "approve, don't read" loop a visible fast path. */
 function HeaderAsk() {
   const { setOpen } = useCommandBar();
   const isMac = useIsMac();
@@ -1107,101 +833,44 @@ function HeaderAsk() {
   );
 }
 
-function OpenSlots({
-  slots,
-  onOpen,
-}: {
-  slots: { start: string; end: string }[];
-  onOpen: () => void;
-}) {
-  if (slots.length === 0) return null;
-
-  return (
-    <div className="rounded-xl border border-dashed border-border bg-card/60 px-4 py-3">
-      <div className="mb-2 flex items-center gap-2 text-sm font-medium">
-        <Clock3 className="size-4 text-muted-foreground" />
-        Open slots
-      </div>
-      <div className="flex flex-col gap-1.5">
-        {slots.map((slot) => (
-          <button
-            key={slot.start}
-            type="button"
-            onClick={onOpen}
-            className="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent"
-          >
-            <span className="font-medium tabular-nums">
-              {fmtTime(slot.start)} - {fmtTime(slot.end)}
-            </span>
-            <span className="text-xs text-muted-foreground">schedule</span>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function AskSlotNest({
-  replies,
-  openSlots,
-}: {
-  replies: number;
-  openSlots: number;
-}) {
-  const { setOpen } = useCommandBar();
-  const isMac = useIsMac();
-  const prompt =
-    replies > 0 && openSlots > 0
-      ? "Draft replies and use my open slots today…"
-      : replies > 0
-        ? "Help me clear the replies waiting for me…"
-        : openSlots > 0
-          ? "Find someone I should schedule today…"
-          : "Tell me what changed since yesterday…";
-
-  return (
-    <section className="flex flex-col gap-3">
-      <SectionHeader icon={Sparkles}>Ask SlotNest</SectionHeader>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="group flex w-full items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3.5 text-left text-sm transition-colors hover:bg-primary/10"
-      >
-        <Sparkles className="size-4 shrink-0 text-[var(--honey-ink)]" />
-        <span className="flex-1 text-foreground/70">{prompt}</span>
-        <Kbd>{isMac ? "⌘" : "Ctrl"}</Kbd>
-        <Kbd>K</Kbd>
-        <ArrowRight className="size-4 text-[var(--honey-ink)] transition-transform group-hover:translate-x-0.5" />
-      </button>
-    </section>
-  );
-}
-
-function EmptyState({
+function SectionTitle({
   icon: Icon,
   children,
 }: {
-  icon?: LucideIcon;
+  icon: typeof Inbox;
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-dashed border-border bg-card/50 px-5 py-8 text-left text-sm text-muted-foreground">
-      {Icon ? (
-        <Icon className="mt-0.5 size-5 shrink-0 text-muted-foreground/50" />
-      ) : null}
-      <div className="max-w-md">{children}</div>
+    <div className="flex items-center gap-2 text-sm font-semibold">
+      <Icon className="size-4 text-muted-foreground" />
+      <span>{children}</span>
     </div>
   );
 }
 
-function ZoneSkeleton() {
+function PanelEmpty({
+  icon: Icon,
+  children,
+}: {
+  icon: typeof Inbox;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="flex flex-col gap-2">
-      {Array.from({ length: 3 }).map((_, i) => (
+    <div className="m-4 flex items-start gap-3 rounded-lg border border-dashed border-border bg-background/60 px-4 py-6 text-sm text-muted-foreground">
+      <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground/60" />
+      <p>{children}</p>
+    </div>
+  );
+}
+
+function QueueSkeleton({ compact = false }: { compact?: boolean }) {
+  return (
+    <div className="space-y-2 p-3">
+      {Array.from({ length: compact ? 2 : 5 }).map((_, index) => (
         <Skeleton
           // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton
-          key={i}
-          className="h-20 w-full rounded-xl"
+          key={index}
+          className="h-16 w-full rounded-lg"
         />
       ))}
     </div>

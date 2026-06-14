@@ -3,12 +3,14 @@
 import {
   CalendarDays,
   ChevronsUpDown,
+  FileText,
   Inbox,
   LogOut,
   Monitor,
   Moon,
   Plug,
   Search,
+  Send,
   Settings,
   Sun,
   SunMedium,
@@ -64,6 +66,8 @@ const PRIMARY: NavItem[] = [
   { href: "/today", label: "Today", icon: Sun, shortcut: "G T" },
   { href: "/inbox", label: "Inbox", icon: Inbox, shortcut: "G I" },
   { href: "/calendar", label: "Calendar", icon: CalendarDays, shortcut: "G C" },
+  { href: "/drafts", label: "Drafts", icon: FileText, shortcut: "G D" },
+  { href: "/waiting", label: "Waiting", icon: Send, shortcut: "G W" },
 ];
 
 const SECONDARY: NavItem[] = [
@@ -139,6 +143,19 @@ export function AppSidebar() {
   const needsYou =
     inbox.data?.messages.filter((m) => m.triage.action === "Needs reply")
       .length ?? 0;
+  const waitingCount =
+    inbox.data?.messages.filter((m) => {
+      const text = `${m.subject} ${m.snippet}`.toLowerCase();
+      return (
+        m.triage.action !== "Needs reply" &&
+        (text.includes("follow up") ||
+          text.includes("following up") ||
+          text.includes("waiting") ||
+          text.includes("checking in") ||
+          text.includes("reminder") ||
+          text.includes("any update"))
+      );
+    }).length ?? 0;
   const hasUrgent =
     inbox.data?.messages.some(
       (m) => m.triage.action === "Needs reply" && m.triage.urgency === "Urgent",
@@ -153,11 +170,16 @@ export function AppSidebar() {
   const health = connectionHealth(connections.data);
 
   function trailingFor(href: string): React.ReactNode {
-    if (href === "/today" && todayCount > 0) {
-      return <CountBadge count={todayCount} tone="muted" />;
-    }
+    if (href === "/today")
+      return <CountBadge count={needsYou} urgent={hasUrgent} />;
     if (href === "/inbox")
       return <CountBadge count={needsYou} urgent={hasUrgent} />;
+    if (href === "/calendar" && todayCount > 0) {
+      return <CountBadge count={todayCount} tone="muted" />;
+    }
+    if (href === "/drafts") return <CountBadge count={needsYou} />;
+    if (href === "/waiting")
+      return <CountBadge count={waitingCount} tone="muted" />;
     if (href === "/settings" && health) return <StatusDot health={health} />;
     return null;
   }
@@ -264,7 +286,15 @@ export function AppSidebar() {
         {PRIMARY.map((item) => {
           const active = isActive(pathname, item.href);
           const Icon = item.icon;
-          const showCount = item.href === "/inbox" && needsYou > 0;
+          const mobileCount =
+            item.href === "/today" ||
+            item.href === "/inbox" ||
+            item.href === "/drafts"
+              ? needsYou
+              : item.href === "/waiting"
+                ? waitingCount
+                : 0;
+          const showCount = mobileCount > 0;
           return (
             <Link
               key={item.href}
@@ -284,7 +314,7 @@ export function AppSidebar() {
                       hasUrgent ? "bg-urgent" : "bg-primary",
                     )}
                   >
-                    {needsYou > 9 ? "9+" : needsYou}
+                    {mobileCount > 9 ? "9+" : mobileCount}
                   </span>
                 ) : null}
               </span>

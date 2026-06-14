@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Spectral } from "next/font/google";
+import { Instrument_Sans, JetBrains_Mono, Spectral } from "next/font/google";
 import "./globals.css";
 import { LenisProvider } from "@/components/lenis-provider";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -8,13 +8,13 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { TRPCReactProvider } from "@/trpc/react";
 
-const geistSans = Geist({
+const sans = Instrument_Sans({
   variable: "--font-sans",
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const mono = JetBrains_Mono({
+  variable: "--font-mono",
   subsets: ["latin"],
 });
 
@@ -43,8 +43,8 @@ export default function RootLayout({
       className={cn(
         "h-full",
         "antialiased",
-        geistSans.variable,
-        geistMono.variable,
+        sans.variable,
+        mono.variable,
         spectral.variable,
         "font-sans",
       )}
