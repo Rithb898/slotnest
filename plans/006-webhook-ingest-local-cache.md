@@ -87,7 +87,7 @@ ingest hook for triage/embeddings.
    gmail({ authType: "oauth_2", webhookHooks: {
      messageChanged: { after: async (ctx, result) => {
        // plan 007: classify + persist triage
-       // plan 008: embed + upsert into message_embeddings
+       // plan 008: embed + upsert into Qdrant
      } },
    }})
    ```

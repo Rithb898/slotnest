@@ -14,6 +14,8 @@ export const env = createEnv({
     EMAIL_FROM: z.string(),
     APP_URL: z.url(),
     OPENAI_API_KEY: z.string().optional(),
+    QDRANT_URL: z.url().optional(),
+    QDRANT_API_KEY: z.string().optional(),
   },
   client: {},
   runtimeEnv: {
@@ -28,6 +30,8 @@ export const env = createEnv({
     EMAIL_FROM: process.env.EMAIL_FROM,
     APP_URL: process.env.APP_URL,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    QDRANT_URL: process.env.QDRANT_URL,
+    QDRANT_API_KEY: process.env.QDRANT_API_KEY,
   },
   /**
    * Makes it so that empty strings are treated as undefined. `SOME_VAR: z.string()` and

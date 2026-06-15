@@ -9,6 +9,7 @@ import {
   Mail,
   PenLine,
   Plug,
+  Search,
   Send,
   Sparkles,
   Sun,
@@ -84,6 +85,16 @@ function formatDateTime(value: string): string {
   }).format(date);
 }
 
+function formatSearchDate(value: Date | string | null): string {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+  }).format(date);
+}
+
 /** Imperative handle so other surfaces (e.g. /today "Ask SlotNest") can open ⌘K. */
 export function useCommandBar() {
   const ctx = useContext(CommandBarContext);
@@ -99,6 +110,7 @@ export function CommandBar({ children }: { children?: React.ReactNode }) {
   const [query, setQuery] = useState("");
   const [answer, setAnswer] = useState<string | null>(null);
   const [proposals, setProposals] = useState<AgentProposal[]>([]);
+  const [mailSearchQuery, setMailSearchQuery] = useState("");
   const [inviteDraft, setInviteDraft] = useState<InviteDraft | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [replyDraft, setReplyDraft] = useState<ReplyDraft | null>(null);
@@ -180,6 +192,25 @@ export function CommandBar({ children }: { children?: React.ReactNode }) {
   // + keeps it read-only). A "sentence" is anything with whitespace or > ~3 words.
   const trimmed = query.trim();
   const looksLikeSentence = trimmed.length > 0 && /\s/.test(trimmed);
+  const shouldSearchMail = trimmed.length >= 2;
+
+  useEffect(() => {
+    if (!(open && shouldSearchMail)) {
+      setMailSearchQuery("");
+      return;
+    }
+
+    const timer = window.setTimeout(() => setMailSearchQuery(trimmed), 250);
+    return () => window.clearTimeout(timer);
+  }, [open, shouldSearchMail, trimmed]);
+
+  const mailSearch = api.gmail.search.useQuery(
+    { q: mailSearchQuery || " ", limit: 6 },
+    {
+      enabled: open && mailSearchQuery.length >= 2,
+      staleTime: 30_000,
+    },
+  );
 
   const runAgent = useCallback(() => {
     if (!trimmed) return;
@@ -339,6 +370,45 @@ export function CommandBar({ children }: { children?: React.ReactNode }) {
                 );
               })}
             </div>
+          ) : null}
+
+          {shouldSearchMail ? (
+            <CommandGroup heading="Mail">
+              {mailSearch.isPending ? (
+                <CommandItem value={`search-loading ${trimmed}`} disabled>
+                  <Loader2 className="animate-spin" />
+                  <span>Searching mail…</span>
+                </CommandItem>
+              ) : null}
+              {mailSearch.data?.results.map((result) => (
+                <CommandItem
+                  key={result.id}
+                  value={`mail ${result.id} ${result.subject} ${result.fromEmail}`}
+                  onSelect={() => go("/inbox")}
+                  className="border-l-2 border-l-transparent data-[selected=true]:border-l-amber-500"
+                >
+                  <Search />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate font-medium">
+                        {result.subject}
+                      </span>
+                      {result.matchedBy.includes("semantic") ? (
+                        <Sparkles className="size-3 shrink-0 text-amber-600" />
+                      ) : null}
+                    </div>
+                    <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                      <span className="truncate">
+                        {result.fromName || result.fromEmail}
+                      </span>
+                      <span className="shrink-0">
+                        {formatSearchDate(result.date)}
+                      </span>
+                    </div>
+                  </div>
+                </CommandItem>
+              ))}
+            </CommandGroup>
           ) : null}
 
           <CommandGroup heading="Go to">

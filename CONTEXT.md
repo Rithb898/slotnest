@@ -19,4 +19,4 @@ The shared language for SlotNest. Terms only — no implementation details.
 - **Free-slot scheduling** — Finding open time on the User's calendar and proposing/sending an invite at a real free slot, from natural language.
 - **Email→invite** — A one-shot workflow turning an open email into a calendar invite to the sender (time/title extracted by LLM).
 - **Local cache** — Emails/events pushed via Corsair webhooks and persisted in Postgres; the source for fast local search (not live Gmail polling).
-- **Hybrid search** — Search combining semantic (pgvector embeddings) and keyword (Postgres full-text) over the local cache.
+- **Hybrid search** — Search combining semantic (Qdrant embeddings) and keyword (Corsair/Postgres contains filters) over the local cache.

@@ -11,6 +11,7 @@ import {
   toDate,
 } from "@/lib/gmail";
 import { buildRfc2822ReplyRaw } from "@/lib/gmail-reply-raw";
+import { searchMessageEmbeddings } from "@/lib/message-embeddings";
 import { type Triage, triage } from "@/lib/triage";
 import { classifyTriage } from "@/lib/triage-llm";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
@@ -157,6 +158,19 @@ type NormalizedGmailMessage = {
   html: string | null;
   text: string | null;
   triageInput: Parameters<typeof classifyTriage>[0];
+};
+
+type GmailSearchResult = {
+  id: string;
+  threadId: string | null;
+  fromName: string;
+  fromEmail: string;
+  subject: string;
+  snippet: string;
+  date: Date | null;
+  unread: boolean;
+  score: number;
+  matchedBy: Array<"keyword" | "semantic">;
 };
 
 /** Model used for drafts — stored on each row so prompt/model bumps invalidate. */
@@ -351,7 +365,220 @@ async function getMessageTriage(
   );
 }
 
+function toSearchResult(
+  message: NormalizedGmailMessage,
+  score: number,
+  matchedBy: Array<"keyword" | "semantic">,
+): GmailSearchResult {
+  return {
+    id: message.id,
+    threadId: message.threadId,
+    fromName: message.fromName,
+    fromEmail: message.fromEmail,
+    subject: message.subject,
+    snippet: message.snippet,
+    date: message.date,
+    unread: message.unread,
+    score,
+    matchedBy,
+  };
+}
+
+function mergeSearchResults({
+  keyword,
+  semantic,
+  limit,
+}: {
+  keyword: NormalizedGmailMessage[];
+  semantic: Array<{ message: NormalizedGmailMessage; similarity: number }>;
+  limit: number;
+}): GmailSearchResult[] {
+  const ranked = new Map<
+    string,
+    {
+      message: NormalizedGmailMessage;
+      score: number;
+      matchedBy: Set<"keyword" | "semantic">;
+    }
+  >();
+
+  keyword.forEach((message, index) => {
+    ranked.set(message.id, {
+      message,
+      score: 1 / (60 + index + 1),
+      matchedBy: new Set(["keyword"]),
+    });
+  });
+
+  semantic.forEach(({ message, similarity }, index) => {
+    const existing = ranked.get(message.id);
+    const score = Math.max(0, similarity) + 1 / (60 + index + 1);
+    if (existing) {
+      existing.score += score;
+      existing.matchedBy.add("semantic");
+      return;
+    }
+    ranked.set(message.id, {
+      message,
+      score,
+      matchedBy: new Set(["semantic"]),
+    });
+  });
+
+  return [...ranked.values()]
+    .sort((a, b) => {
+      const delta = b.score - a.score;
+      if (delta !== 0) return delta;
+      return (
+        (b.message.date?.getTime() ?? 0) - (a.message.date?.getTime() ?? 0)
+      );
+    })
+    .slice(0, limit)
+    .map((item) =>
+      toSearchResult(item.message, item.score, [...item.matchedBy]),
+    );
+}
+
+async function getKeywordSearchMessages({
+  tenant,
+  query,
+  limit,
+}: {
+  tenant: ReturnType<typeof corsair.withTenant>;
+  query: string;
+  limit: number;
+}): Promise<NormalizedGmailMessage[]> {
+  const fields = ["subject", "snippet", "body", "from", "to"] as const;
+  const rows = await Promise.all(
+    fields.map((field) =>
+      tenant.gmail.db.messages.search({
+        data: { [field]: { contains: query } },
+        limit,
+      }),
+    ),
+  );
+
+  const byId = new Map<string, NormalizedGmailMessage>();
+  for (const row of rows.flat()) {
+    const message = normalizeGmailMessage(row.data, row.entity_id);
+    if (!byId.has(message.id)) {
+      byId.set(message.id, message);
+    }
+  }
+
+  return [...byId.values()].sort(
+    (a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0),
+  );
+}
+
+async function getSemanticSearchMessages({
+  userId,
+  query,
+  limit,
+}: {
+  userId: string;
+  query: string;
+  limit: number;
+}): Promise<Array<{ message: NormalizedGmailMessage; similarity: number }>> {
+  if (!env.OPENAI_API_KEY || !env.QDRANT_URL) return [];
+
+  const hits = await searchMessageEmbeddings({
+    tenantId: userId,
+    query,
+    limit,
+  });
+  if (hits.length === 0) return [];
+
+  const rows = await db
+    .select({
+      data: corsairEntities.data,
+      gmailMessageId: corsairEntities.entityId,
+      entityId: corsairEntities.id,
+    })
+    .from(corsairEntities)
+    .innerJoin(
+      corsairAccounts,
+      eq(corsairEntities.accountId, corsairAccounts.id),
+    )
+    .innerJoin(
+      corsairIntegrations,
+      eq(corsairAccounts.integrationId, corsairIntegrations.id),
+    )
+    .where(
+      and(
+        inArray(
+          corsairEntities.id,
+          hits.map((hit) => hit.entityId),
+        ),
+        eq(corsairAccounts.tenantId, userId),
+        eq(corsairIntegrations.name, "gmail"),
+        eq(corsairEntities.entityType, "messages"),
+      ),
+    );
+
+  const rowsByEntityId = new Map(rows.map((row) => [row.entityId, row]));
+  return hits.flatMap((hit) => {
+    const row = rowsByEntityId.get(hit.entityId);
+    return row
+      ? [
+          {
+            message: normalizeGmailMessage(
+              row.data as CachedGmailMessage,
+              row.gmailMessageId,
+            ),
+            similarity: hit.score,
+          },
+        ]
+      : [];
+  });
+}
+
 export const gmailRouter = createTRPCRouter({
+  search: protectedProcedure
+    .input(
+      z.object({
+        q: z.string().trim().min(1),
+        limit: z.number().min(1).max(25).optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      if (!(await isGmailConnected(ctx.session.user.id))) {
+        return {
+          connected: false as const,
+          semanticConfigured: Boolean(env.OPENAI_API_KEY && env.QDRANT_URL),
+          results: [],
+        };
+      }
+
+      const limit = input.limit ?? 8;
+      const tenant = corsair.withTenant(ctx.session.user.id);
+      const keyword = await getKeywordSearchMessages({
+        tenant,
+        query: input.q,
+        limit,
+      });
+
+      let semantic: Array<{
+        message: NormalizedGmailMessage;
+        similarity: number;
+      }> = [];
+      try {
+        semantic = await getSemanticSearchMessages({
+          userId: ctx.session.user.id,
+          query: input.q,
+          limit,
+        });
+      } catch (error) {
+        console.warn("Semantic Gmail search failed:", error);
+      }
+
+      return {
+        connected: true as const,
+        semanticConfigured: Boolean(env.OPENAI_API_KEY && env.QDRANT_URL),
+        results: mergeSearchResults({ keyword, semantic, limit }),
+      };
+    }),
+
   /**
    * Lists INBOX messages from Corsair's tenant-scoped local DB. When the cache
    * is empty (or a caller asks for `forceFresh`), we keep the live API path as a

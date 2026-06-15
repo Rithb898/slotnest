@@ -1,7 +1,7 @@
-# Plan 008: Hybrid search — pgvector semantic + Postgres keyword
+# Plan 008: Hybrid search — Qdrant semantic + Postgres keyword
 
 > **Executor instructions**: Read in full before starting. This adds sub-second
-> search over the local cache: keyword (Corsair `gmail.db`) + semantic (pgvector
+> search over the local cache: keyword (Corsair `gmail.db`) + semantic (Qdrant
 > embeddings generated on ingest). Heaviest of the P1 plans — only after 004–007
 > land. Update this plan's row in `plans/README.md` when done.
 
@@ -9,7 +9,7 @@
 
 - **Priority**: P1 (PRD signature "instant search"; biggest lift, off the core loop)
 - **Effort**: L
-- **Risk**: MED (pgvector setup + embedding cost; keyword half is nearly free)
+- **Risk**: MED (Qdrant setup + embedding cost; keyword half is nearly free)
 - **Depends on**: 006 (local cache + ingest hook)
 - **Category**: intelligence
 - **Planned at**: 2026-06-14
@@ -25,24 +25,25 @@
   supports `contains` on `subject`, `snippet`, `raw` (and `threadId`, etc.) —
   `docs/corsair/plugins/gmail/database.md`. That alone gives a fast local keyword
   search with no new infra.
-- **Semantic** is the new build: pgvector embeddings keyed to
-  `corsair_entities.id`.
+- **Semantic** is the new build: Qdrant embeddings keyed to
+  `corsair_entities.id`, with Postgres remaining the source of truth.
 
 ## Build order
 
-1. **Enable pgvector** — confirm the extension on the hosted Postgres
-   (`CREATE EXTENSION IF NOT EXISTS vector`). PRD Phase 0 calls for this.
-2. **Embeddings table** — Drizzle `message_embeddings`:
-   `entity_id` (FK → `corsair_entities.id`), `embedding vector(1536)`,
-   `created_at`. (1536 = OpenAI `text-embedding-3-small`.)
+1. **Enable Qdrant** — configure `QDRANT_URL` and optional `QDRANT_API_KEY`.
+   Collection creation is app-managed and idempotent.
+2. **Embeddings collection** — Qdrant collection `slotnest_messages`:
+   1536-dimensional cosine vectors plus payload `{ tenantId, entityId,
+   gmailMessageId, subject, from, date }`. (1536 = OpenAI
+   `text-embedding-3-small`.)
 3. **Embed on ingest** — in the plan 006 `webhookHooks.messageChanged.after`
    hook (alongside triage), embed subject + snippet/body via
-   `text-embedding-3-small`, upsert into `message_embeddings`. One embed per
+   `text-embedding-3-small`, upsert into Qdrant. One embed per
    message, on ingest — never on the read path.
 4. **Backfill** — a one-off script to embed already-cached entities so search
    isn't empty before new mail arrives.
 5. **Query** — `search` procedure: embed the query, ANN cosine over
-   `message_embeddings`, **and** run the `gmail.db` keyword `contains`; merge +
+   Qdrant with tenant filter, **and** run the `gmail.db` keyword `contains`; merge +
    rank (e.g. reciprocal-rank fusion, or keyword-first then semantic fill).
    Join back to `corsair_entities` for display rows.
 6. **Surface** — wire into the ⌘K command bar's search mode (results list with
@@ -57,5 +58,5 @@
 
 - Embedding/searching on the read path instead of ingest — kills the
   "sub-second" claim and burns cost.
-- pgvector not actually enabled on the deploy target — verify before building the
-  table, not after.
+- Qdrant not configured on the deploy target — semantic search should degrade to
+  keyword-only rather than breaking command search.
