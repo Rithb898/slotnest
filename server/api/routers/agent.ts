@@ -1,10 +1,9 @@
+import { OpenAIAgentsProvider } from "@corsair-dev/mcp";
+import { Agent, run, tool } from "@openai/agents";
 import { z } from "zod";
-
 import { env } from "@/lib/config/env";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { corsair } from "@/server/corsair";
-import { OpenAIAgentsProvider } from "@corsair-dev/mcp";
-import { Agent, run, tool } from "@openai/agents";
 
 /**
  * ⌘K natural-language agent (plan 003 step 6).
@@ -33,9 +32,41 @@ import { Agent, run, tool } from "@openai/agents";
  * user to act on through the existing approve-first UI.
  */
 
+const inviteProposalSchema = z.object({
+  kind: z.literal("invite"),
+  summary: z.string().min(1),
+  start: z.string().min(1),
+  end: z.string().min(1),
+  attendees: z.array(z.string().email()).default([]),
+  description: z.string().optional(),
+});
+
+const replyProposalSchema = z.object({
+  kind: z.literal("reply"),
+  to: z.string().email(),
+  subject: z.string().min(1),
+  body: z.string().min(1),
+  threadId: z.string().min(1).optional(),
+  messageId: z.string().min(1).optional(),
+  inReplyTo: z.string().min(1).optional(),
+  references: z.string().min(1).optional(),
+});
+
+const agentProposalSchema = z.discriminatedUnion("kind", [
+  inviteProposalSchema,
+  replyProposalSchema,
+]);
+
+const agentOutputSchema = z.object({
+  text: z.string().min(1),
+  proposals: z.array(agentProposalSchema).max(4).default([]),
+});
+
+export type AgentProposal = z.infer<typeof agentProposalSchema>;
+
 export type AgentResult =
-  | { configured: false; text: string }
-  | { configured: true; text: string };
+  | { configured: false; text: string; proposals: [] }
+  | { configured: true; text: string; proposals: AgentProposal[] };
 
 const INSTRUCTIONS = `You are SlotNest's assistant for a Gmail + Google Calendar workspace.
 You have Corsair tools: use list_operations to discover APIs, get_schema to learn arguments, and run_script to read data.
@@ -44,8 +75,14 @@ The connected plugins are "gmail" and "googlecalendar". Always reference resourc
 STRICT RULES:
 - READ ONLY. You may inspect email and calendar data (e.g. gmail.api.messages.list/get, googlecalendar.api.events.getMany, googlecalendar.api.calendar.getAvailability).
 - NEVER perform a write: do not send email, create/update/delete events, or change any state. Do not call any operation whose risk is "write".
-- If the user asks to send, reply, schedule, book, or invite, DO NOT do it. Instead, gather the relevant details (proposed time, attendees, free slots) and return a clear PROPOSAL the user can approve in the app. Explain that they must confirm it themselves.
-- Be concise. Return plain text suitable for a small result panel.`;
+- If the user asks to send, reply, schedule, book, or invite, DO NOT do it. Instead, gather the relevant details (proposed time, attendees, free slots) and return proposals the user can approve in the app.
+- Return structured output with:
+  - text: concise plain text for a small result panel.
+  - proposals: zero or more proposed actions.
+- For invite proposals, include ISO datetime strings for start/end, a title, and attendee email addresses.
+- For reply proposals, include to, subject, body, and include threadId/messageId/inReplyTo/references when known from Gmail.
+- If one sentence implies both a calendar invite and an email, return both proposals.
+- If required details are missing, explain what is missing in text and omit that proposal.`;
 
 export const agentRouter = createTRPCRouter({
   ask: protectedProcedure
@@ -55,6 +92,7 @@ export const agentRouter = createTRPCRouter({
         return {
           configured: false,
           text: "Agent not configured (set OPENAI_API_KEY).",
+          proposals: [],
         };
       }
 
@@ -72,12 +110,18 @@ export const agentRouter = createTRPCRouter({
         model: "gpt-4.1-mini",
         instructions: INSTRUCTIONS,
         tools,
+        outputType: agentOutputSchema,
       });
 
       const result = await run(agent, input.prompt);
+      const output = result.finalOutput ?? {
+        text: "(no response)",
+        proposals: [],
+      };
       return {
         configured: true,
-        text: result.finalOutput ?? "(no response)",
+        text: output.text,
+        proposals: output.proposals,
       };
     }),
 });

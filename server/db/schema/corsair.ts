@@ -1,4 +1,4 @@
-import { jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { index, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 export const corsairIntegrations = pgTable("corsair_integrations", {
   id: text("id").primaryKey(),
@@ -61,3 +61,19 @@ export const corsairEvents = pgTable("corsair_events", {
   payload: jsonb("payload").notNull().default({}),
   status: text("status"),
 });
+
+export const messageTriage = pgTable(
+  "message_triage",
+  {
+    entityId: text("entity_id")
+      .primaryKey()
+      .references(() => corsairEntities.id, { onDelete: "cascade" }),
+    action: text("action").notNull(),
+    urgency: text("urgency").notNull(),
+    model: text("model").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("message_triage_action_urgency_idx").on(t.action, t.urgency)],
+);

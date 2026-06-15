@@ -186,7 +186,9 @@ export function WaitingClient() {
         open={replyOpen}
         onOpenChange={setReplyOpen}
         draft={replyDraft}
-        onSent={() => replyDraft && setState(replyDraft.messageId, "resolved")}
+        onSent={() =>
+          replyDraft?.messageId && setState(replyDraft.messageId, "resolved")
+        }
       />
     </div>
   );

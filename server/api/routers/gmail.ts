@@ -1,5 +1,5 @@
 import { Agent, run } from "@openai/agents";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { env } from "@/lib/config/env";
@@ -11,13 +11,16 @@ import {
   toDate,
 } from "@/lib/gmail";
 import { buildRfc2822ReplyRaw } from "@/lib/gmail-reply-raw";
-import { triage } from "@/lib/triage";
+import { type Triage, triage } from "@/lib/triage";
+import { classifyTriage } from "@/lib/triage-llm";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { corsair } from "@/server/corsair";
 import { db } from "@/server/db";
 import {
   corsairAccounts,
+  corsairEntities,
   corsairIntegrations,
+  messageTriage,
   replyDraft,
 } from "@/server/db/schema";
 
@@ -39,9 +42,122 @@ async function isGmailConnected(userId: string): Promise<boolean> {
   return rows.some((r) => r.name === "gmail");
 }
 
+const storedTriageSchema = z.object({
+  action: z.enum(["Needs reply", "FYI", "Ignore"]),
+  urgency: z.enum(["Urgent", "Normal", "Low"]),
+});
+
+type TriageCacheRecord = {
+  entityId: string;
+  triage: Triage | null;
+};
+
+async function getTriageCacheByGmailMessageId(
+  userId: string,
+  gmailMessageIds: string[],
+): Promise<Map<string, TriageCacheRecord>> {
+  if (gmailMessageIds.length === 0) {
+    return new Map();
+  }
+
+  const rows = await db
+    .select({
+      gmailMessageId: corsairEntities.entityId,
+      entityId: corsairEntities.id,
+      action: messageTriage.action,
+      urgency: messageTriage.urgency,
+    })
+    .from(corsairEntities)
+    .leftJoin(messageTriage, eq(messageTriage.entityId, corsairEntities.id))
+    .innerJoin(
+      corsairAccounts,
+      eq(corsairEntities.accountId, corsairAccounts.id),
+    )
+    .innerJoin(
+      corsairIntegrations,
+      eq(corsairAccounts.integrationId, corsairIntegrations.id),
+    )
+    .where(
+      and(
+        inArray(corsairEntities.entityId, gmailMessageIds),
+        eq(corsairEntities.entityType, "messages"),
+        eq(corsairAccounts.tenantId, userId),
+        eq(corsairIntegrations.name, "gmail"),
+      ),
+    );
+
+  const records = new Map<string, TriageCacheRecord>();
+  for (const row of rows) {
+    const parsed = storedTriageSchema.safeParse({
+      action: row.action,
+      urgency: row.urgency,
+    });
+    records.set(row.gmailMessageId, {
+      entityId: row.entityId,
+      triage: parsed.success ? parsed.data : null,
+    });
+  }
+  return records;
+}
+
+async function classifyAndStoreTriage(
+  entityId: string,
+  input: Parameters<typeof classifyTriage>[0],
+): Promise<Triage> {
+  const classification = await classifyTriage(input);
+  await db
+    .insert(messageTriage)
+    .values({
+      entityId,
+      action: classification.triage.action,
+      urgency: classification.triage.urgency,
+      model: classification.model,
+    })
+    .onConflictDoUpdate({
+      target: messageTriage.entityId,
+      set: {
+        action: classification.triage.action,
+        urgency: classification.triage.urgency,
+        model: classification.model,
+      },
+    });
+  return classification.triage;
+}
+
 type DraftReplyResult =
   | { configured: false; text: string }
   | { configured: true; text: string };
+
+type CachedGmailMessage = {
+  id?: string;
+  threadId?: string;
+  labelIds?: string[];
+  snippet?: string;
+  internalDate?: string | number | Date | null;
+  payload?: GmailPayload;
+  subject?: string;
+  body?: string;
+  from?: string;
+  to?: string;
+};
+
+type NormalizedGmailMessage = {
+  id: string;
+  threadId: string | null;
+  fromName: string;
+  fromEmail: string;
+  to: string;
+  subject: string;
+  messageIdHeader: string | null;
+  references: string | null;
+  snippet: string;
+  date: Date | null;
+  unread: boolean;
+  labelIds: string[];
+  html: string | null;
+  text: string | null;
+  triageInput: Parameters<typeof classifyTriage>[0];
+};
 
 /** Model used for drafts — stored on each row so prompt/model bumps invalidate. */
 const DRAFT_MODEL = "gpt-4.1-mini";
@@ -81,15 +197,165 @@ function cleanDraftText(text: string): string {
     .trim();
 }
 
+function normalizeGmailMessage(
+  message: CachedGmailMessage,
+  fallbackId: string,
+): NormalizedGmailMessage {
+  const headers = message.payload?.headers;
+  const from = parseAddress(getHeader(headers, "From") ?? message.from);
+  const body = extractBody(message.payload);
+  const subject =
+    getHeader(headers, "Subject") ?? message.subject ?? "(no subject)";
+  const snippet = message.snippet ?? "";
+  const labelIds = message.labelIds ?? [];
+  const date = toDate(message.internalDate);
+  const sourceText =
+    body.text?.trim() ||
+    message.body?.trim() ||
+    (body.html ? stripHtml(body.html) : "") ||
+    snippet;
+
+  return {
+    id: message.id ?? fallbackId,
+    threadId: message.threadId ?? null,
+    fromName: from.name,
+    fromEmail: from.email,
+    to: getHeader(headers, "To") ?? message.to ?? "",
+    subject,
+    messageIdHeader: getHeader(headers, "Message-ID") ?? null,
+    references: getHeader(headers, "References") ?? null,
+    snippet,
+    date,
+    unread: labelIds.includes("UNREAD"),
+    labelIds,
+    html: body.html ?? null,
+    text: body.text ?? message.body ?? null,
+    triageInput: {
+      subject,
+      snippet,
+      body: sourceText,
+      fromEmail: from.email,
+      unread: labelIds.includes("UNREAD"),
+      date,
+      labelIds,
+      listUnsubscribe: Boolean(getHeader(headers, "List-Unsubscribe")),
+    },
+  };
+}
+
+function messageMatchesQuery(message: NormalizedGmailMessage, query?: string) {
+  const trimmed = query?.trim().toLowerCase();
+  if (!trimmed) return true;
+  return [
+    message.fromName,
+    message.fromEmail,
+    message.to,
+    message.subject,
+    message.snippet,
+    message.text ?? "",
+    message.html ? stripHtml(message.html) : "",
+  ].some((value) => value.toLowerCase().includes(trimmed));
+}
+
+async function getLiveInboxMessages({
+  tenant,
+  q,
+  maxResults,
+  pageToken,
+}: {
+  tenant: ReturnType<typeof corsair.withTenant>;
+  q?: string;
+  maxResults: number;
+  pageToken?: string;
+}) {
+  const list = await tenant.gmail.api.messages.list({
+    labelIds: ["INBOX"],
+    maxResults,
+    q,
+    pageToken,
+  });
+
+  const ids = (list.messages ?? [])
+    .map((m) => m.id)
+    .filter((id): id is string => Boolean(id));
+
+  const messages = await Promise.all(
+    ids.map(async (id) => {
+      const msg = await tenant.gmail.api.messages.get({
+        id,
+        format: "full",
+      });
+      return normalizeGmailMessage(msg as CachedGmailMessage, msg.id ?? id);
+    }),
+  );
+
+  return {
+    messages,
+    nextPageToken: list.nextPageToken ?? null,
+  };
+}
+
+async function getCachedInboxMessages({
+  tenant,
+  q,
+  maxResults,
+  pageToken,
+}: {
+  tenant: ReturnType<typeof corsair.withTenant>;
+  q?: string;
+  maxResults: number;
+  pageToken?: string;
+}) {
+  const offset = pageToken ? Number(pageToken) : 0;
+  const normalizedOffset = Number.isFinite(offset) && offset > 0 ? offset : 0;
+  const rows = await tenant.gmail.db.messages.list({
+    limit: Math.max(250, maxResults + normalizedOffset + 1),
+    offset: 0,
+  });
+
+  const filtered = rows
+    .map((row) => normalizeGmailMessage(row.data, row.entity_id))
+    .filter((message) => message.labelIds.includes("INBOX"))
+    .filter((message) => messageMatchesQuery(message, q))
+    .sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0));
+
+  const page = filtered.slice(normalizedOffset, normalizedOffset + maxResults);
+  const nextOffset = normalizedOffset + maxResults;
+  return {
+    messages: page,
+    nextPageToken: filtered.length > nextOffset ? String(nextOffset) : null,
+  };
+}
+
+async function getCachedMessage(
+  tenant: ReturnType<typeof corsair.withTenant>,
+  id: string,
+) {
+  const row = await tenant.gmail.db.messages.findByEntityId(id);
+  return row ? normalizeGmailMessage(row.data, row.entity_id) : null;
+}
+
+async function getMessageTriage(
+  userId: string,
+  message: NormalizedGmailMessage,
+) {
+  const triageCache = await getTriageCacheByGmailMessageId(userId, [
+    message.id,
+  ]);
+  const cached = triageCache.get(message.id);
+  return (
+    cached?.triage ??
+    (cached
+      ? await classifyAndStoreTriage(cached.entityId, message.triageInput)
+      : triage(message.triageInput))
+  );
+}
+
 export const gmailRouter = createTRPCRouter({
   /**
-   * Lists INBOX messages with the metadata needed for a list row (from,
-   * subject, date, snippet, unread). Gmail's list endpoint returns only ids, so
-   * we fan out `messages.get` per id.
-   *
-   * NOTE: we request `format: "full"`, not `metadata`. Corsair's `metadata`
-   * format drops `payload.headers` entirely (verified against the live API), so
-   * From/Subject/Date are only readable via `full`. Heavier, but correct.
+   * Lists INBOX messages from Corsair's tenant-scoped local DB. When the cache
+   * is empty (or a caller asks for `forceFresh`), we keep the live API path as a
+   * read-through fallback so first-run accounts still populate and render.
    */
   inbox: protectedProcedure
     .input(
@@ -98,6 +364,7 @@ export const gmailRouter = createTRPCRouter({
           q: z.string().optional(),
           maxResults: z.number().min(1).max(50).optional(),
           pageToken: z.string().optional(),
+          forceFresh: z.boolean().optional(),
         })
         .optional(),
     )
@@ -111,59 +378,54 @@ export const gmailRouter = createTRPCRouter({
       }
 
       const tenant = corsair.withTenant(ctx.session.user.id);
+      const maxResults = input?.maxResults ?? 25;
 
-      const list = await tenant.gmail.api.messages.list({
-        labelIds: ["INBOX"],
-        maxResults: input?.maxResults ?? 25,
-        q: input?.q,
-        pageToken: input?.pageToken,
-      });
+      const cached = input?.forceFresh
+        ? { messages: [], nextPageToken: null }
+        : await getCachedInboxMessages({
+            tenant,
+            q: input?.q,
+            maxResults,
+            pageToken: input?.pageToken,
+          });
 
-      const ids = (list.messages ?? [])
-        .map((m) => m.id)
-        .filter((id): id is string => Boolean(id));
+      const source =
+        cached.messages.length > 0 || input?.pageToken
+          ? cached
+          : await getLiveInboxMessages({
+              tenant,
+              q: input?.q,
+              maxResults,
+              pageToken: input?.pageToken,
+            });
+
+      const triageCache = await getTriageCacheByGmailMessageId(
+        ctx.session.user.id,
+        source.messages.map((m) => m.id),
+      );
 
       const messages = await Promise.all(
-        ids.map(async (id) => {
-          const msg = await tenant.gmail.api.messages.get({
-            id,
-            format: "full",
-          });
-          const headers = msg.payload?.headers;
-          const from = parseAddress(getHeader(headers, "From"));
-          const subject = getHeader(headers, "Subject") ?? "(no subject)";
-          const messageIdHeader = getHeader(headers, "Message-ID") ?? null;
-          const references = getHeader(headers, "References") ?? null;
-          const snippet = msg.snippet ?? "";
-          const date = toDate(msg.internalDate);
-          const labelIds = msg.labelIds ?? [];
-          const unread = labelIds.includes("UNREAD");
-          const listUnsubscribe = Boolean(
-            getHeader(headers, "List-Unsubscribe"),
-          );
-          // Heuristic triage (no LLM) — see lib/triage.ts. Gmail's category
-          // labels + List-Unsubscribe header do the heavy lifting for bulk mail.
-          // Computed per-request; cheap enough that a local cache isn't warranted.
-          const labels = triage({
-            subject,
-            snippet,
-            fromEmail: from.email,
-            unread,
-            date,
-            labelIds,
-            listUnsubscribe,
-          });
+        source.messages.map(async (message) => {
+          const cached = triageCache.get(message.id);
+          const labels =
+            cached?.triage ??
+            (cached
+              ? await classifyAndStoreTriage(
+                  cached.entityId,
+                  message.triageInput,
+                )
+              : triage(message.triageInput));
           return {
-            id: msg.id ?? id,
-            threadId: msg.threadId ?? null,
-            fromName: from.name,
-            fromEmail: from.email,
-            subject,
-            messageIdHeader,
-            references,
-            snippet,
-            date,
-            unread,
+            id: message.id,
+            threadId: message.threadId,
+            fromName: message.fromName,
+            fromEmail: message.fromEmail,
+            subject: message.subject,
+            messageIdHeader: message.messageIdHeader,
+            references: message.references,
+            snippet: message.snippet,
+            date: message.date,
+            unread: message.unread,
             triage: labels,
           };
         }),
@@ -172,7 +434,7 @@ export const gmailRouter = createTRPCRouter({
       return {
         connected: true as const,
         messages,
-        nextPageToken: list.nextPageToken ?? null,
+        nextPageToken: source.nextPageToken,
       };
     }),
 
@@ -181,32 +443,38 @@ export const gmailRouter = createTRPCRouter({
    * plain-text fallback).
    */
   message: protectedProcedure
-    .input(z.object({ id: z.string() }))
+    .input(z.object({ id: z.string(), forceFresh: z.boolean().optional() }))
     .query(async ({ ctx, input }) => {
       const tenant = corsair.withTenant(ctx.session.user.id);
 
-      const msg = await tenant.gmail.api.messages.get({
-        id: input.id,
-        format: "full",
-      });
-
-      const headers = msg.payload?.headers;
-      const from = parseAddress(getHeader(headers, "From"));
-      const body = extractBody(msg.payload as GmailPayload | undefined);
+      const cached = input.forceFresh
+        ? null
+        : await getCachedMessage(tenant, input.id);
+      const message =
+        cached ??
+        normalizeGmailMessage(
+          (await tenant.gmail.api.messages.get({
+            id: input.id,
+            format: "full",
+          })) as CachedGmailMessage,
+          input.id,
+        );
+      const labels = await getMessageTriage(ctx.session.user.id, message);
 
       return {
-        id: msg.id ?? input.id,
-        threadId: msg.threadId ?? null,
-        fromName: from.name,
-        fromEmail: from.email,
-        to: getHeader(headers, "To") ?? "",
-        subject: getHeader(headers, "Subject") ?? "(no subject)",
-        messageIdHeader: getHeader(headers, "Message-ID") ?? null,
-        references: getHeader(headers, "References") ?? null,
-        date: toDate(msg.internalDate),
-        snippet: msg.snippet ?? "",
-        html: body.html ?? null,
-        text: body.text ?? null,
+        id: message.id,
+        threadId: message.threadId,
+        fromName: message.fromName,
+        fromEmail: message.fromEmail,
+        to: message.to,
+        subject: message.subject,
+        messageIdHeader: message.messageIdHeader,
+        references: message.references,
+        date: message.date,
+        snippet: message.snippet,
+        triage: labels,
+        html: message.html,
+        text: message.text,
       };
     }),
 
@@ -314,20 +582,19 @@ export const gmailRouter = createTRPCRouter({
       }
 
       const tenant = corsair.withTenant(userId);
-      const msg = await tenant.gmail.api.messages.get({
-        id: input.messageId,
-        format: "full",
-      });
-
-      const headers = msg.payload?.headers;
-      const from = parseAddress(getHeader(headers, "From"));
-      const subject = getHeader(headers, "Subject") ?? "(no subject)";
-      const threadId = msg.threadId ?? null;
-      const body = extractBody(msg.payload as GmailPayload | undefined);
+      const sourceMessage =
+        (await getCachedMessage(tenant, input.messageId)) ??
+        normalizeGmailMessage(
+          (await tenant.gmail.api.messages.get({
+            id: input.messageId,
+            format: "full",
+          })) as CachedGmailMessage,
+          input.messageId,
+        );
       const sourceText =
-        body.text?.trim() ||
-        (body.html ? stripHtml(body.html) : "") ||
-        msg.snippet ||
+        sourceMessage.text?.trim() ||
+        (sourceMessage.html ? stripHtml(sourceMessage.html) : "") ||
+        sourceMessage.snippet ||
         "";
 
       const agent = new Agent({
@@ -337,8 +604,8 @@ export const gmailRouter = createTRPCRouter({
       });
 
       const prompt = `Original email:
-From: ${from.name || from.email} <${from.email}>
-Subject: ${subject}
+From: ${sourceMessage.fromName || sourceMessage.fromEmail} <${sourceMessage.fromEmail}>
+Subject: ${sourceMessage.subject}
 
 ${sourceText.slice(0, 8000)}
 
@@ -354,7 +621,7 @@ Write the reply body now.`;
           id,
           userId,
           messageId: input.messageId,
-          threadId,
+          threadId: sourceMessage.threadId,
           body: text,
           model: DRAFT_MODEL,
           status: "generated",
@@ -364,7 +631,7 @@ Write the reply body now.`;
           set: {
             body: text,
             model: DRAFT_MODEL,
-            threadId,
+            threadId: sourceMessage.threadId,
             status: "generated",
             updatedAt: new Date(),
           },

@@ -445,7 +445,9 @@ export function TodayClient() {
         open={replyOpen}
         onOpenChange={setReplyOpen}
         draft={replyDraft}
-        onSent={() => replyDraft && setAction(replyDraft.messageId, "approved")}
+        onSent={() =>
+          replyDraft?.messageId && setAction(replyDraft.messageId, "approved")
+        }
       />
       <InviteDialog
         open={inviteOpen}

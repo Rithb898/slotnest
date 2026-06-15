@@ -2,9 +2,11 @@
 
 import {
   CalendarDays,
+  CalendarPlus,
   FileText,
   Inbox,
   Loader2,
+  Mail,
   PenLine,
   Plug,
   Send,
@@ -20,7 +22,9 @@ import {
   useEffect,
   useState,
 } from "react";
-
+import { InviteDialog, type InviteDraft } from "@/components/invite-dialog";
+import { ReplyDialog, type ReplyDraft } from "@/components/reply-dialog";
+import { Button } from "@/components/ui/button";
 import {
   CommandDialog,
   CommandEmpty,
@@ -31,6 +35,7 @@ import {
   CommandSeparator,
   CommandShortcut,
 } from "@/components/ui/command";
+import type { RouterOutputs } from "@/trpc/react";
 import { api } from "@/trpc/react";
 
 /**
@@ -65,6 +70,20 @@ const GOTO: Record<string, Route> = {
 
 const CommandBarContext = createContext<CommandBarContextValue | null>(null);
 
+type AgentProposal = RouterOutputs["agent"]["ask"]["proposals"][number];
+
+function formatDateTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+}
+
 /** Imperative handle so other surfaces (e.g. /today "Ask SlotNest") can open ⌘K. */
 export function useCommandBar() {
   const ctx = useContext(CommandBarContext);
@@ -79,10 +98,21 @@ export function CommandBar({ children }: { children?: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [answer, setAnswer] = useState<string | null>(null);
+  const [proposals, setProposals] = useState<AgentProposal[]>([]);
+  const [inviteDraft, setInviteDraft] = useState<InviteDraft | null>(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [replyDraft, setReplyDraft] = useState<ReplyDraft | null>(null);
+  const [replyOpen, setReplyOpen] = useState(false);
 
   const ask = api.agent.ask.useMutation({
-    onSuccess: (res) => setAnswer(res.text),
-    onError: (err) => setAnswer(`Couldn't reach the assistant: ${err.message}`),
+    onSuccess: (res) => {
+      setAnswer(res.text);
+      setProposals(res.proposals);
+    },
+    onError: (err) => {
+      setAnswer(`Couldn't reach the assistant: ${err.message}`);
+      setProposals([]);
+    },
   });
 
   const toggle = useCallback(() => setOpen((o) => !o), []);
@@ -133,6 +163,7 @@ export function CommandBar({ children }: { children?: React.ReactNode }) {
     if (!open) {
       setQuery("");
       setAnswer(null);
+      setProposals([]);
       ask.reset();
     }
   }, [open, ask.reset]);
@@ -153,8 +184,36 @@ export function CommandBar({ children }: { children?: React.ReactNode }) {
   const runAgent = useCallback(() => {
     if (!trimmed) return;
     setAnswer(null);
+    setProposals([]);
     ask.mutate({ prompt: trimmed });
   }, [trimmed, ask]);
+
+  const approveProposal = useCallback((proposal: AgentProposal) => {
+    setOpen(false);
+    if (proposal.kind === "invite") {
+      setInviteDraft({
+        summary: proposal.summary,
+        start: proposal.start,
+        end: proposal.end,
+        attendees: proposal.attendees,
+        description: proposal.description,
+      });
+      setInviteOpen(true);
+      return;
+    }
+
+    if (!proposal.threadId) return;
+    setReplyDraft({
+      to: proposal.to,
+      subject: proposal.subject,
+      body: proposal.body,
+      threadId: proposal.threadId,
+      messageId: proposal.messageId,
+      inReplyTo: proposal.inReplyTo,
+      references: proposal.references,
+    });
+    setReplyOpen(true);
+  }, []);
 
   return (
     <CommandBarContext.Provider value={{ open, setOpen, toggle }}>
@@ -212,6 +271,76 @@ export function CommandBar({ children }: { children?: React.ReactNode }) {
             </div>
           ) : null}
 
+          {proposals.length > 0 ? (
+            <div className="flex flex-col gap-2 border-t border-border px-3 py-3">
+              {proposals.map((proposal, index) => {
+                const key = `${proposal.kind}-${index}`;
+                const canApprove =
+                  proposal.kind === "invite" || Boolean(proposal.threadId);
+                return (
+                  <div
+                    key={key}
+                    className="rounded-md border border-border bg-muted/40 p-3"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 space-y-1">
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                          {proposal.kind === "invite" ? (
+                            <CalendarPlus className="size-4 text-muted-foreground" />
+                          ) : (
+                            <Mail className="size-4 text-muted-foreground" />
+                          )}
+                          <span className="truncate">
+                            {proposal.kind === "invite"
+                              ? proposal.summary
+                              : proposal.subject}
+                          </span>
+                        </div>
+                        {proposal.kind === "invite" ? (
+                          <div className="space-y-1 text-xs text-muted-foreground">
+                            <p>
+                              {formatDateTime(proposal.start)} -{" "}
+                              {formatDateTime(proposal.end)}
+                            </p>
+                            {proposal.attendees.length > 0 ? (
+                              <p className="truncate">
+                                {proposal.attendees.join(", ")}
+                              </p>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <div className="space-y-1 text-xs text-muted-foreground">
+                            <p className="truncate">To {proposal.to}</p>
+                            <p className="line-clamp-2 whitespace-pre-wrap">
+                              {proposal.body}
+                            </p>
+                            {!proposal.threadId ? (
+                              <p>Open a Gmail thread before sending.</p>
+                            ) : null}
+                          </div>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        disabled={!canApprove}
+                        onClick={() => approveProposal(proposal)}
+                      >
+                        {proposal.kind === "invite" ? (
+                          <CalendarPlus className="size-4" />
+                        ) : (
+                          <Send className="size-4" />
+                        )}
+                        Approve
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+
           <CommandGroup heading="Go to">
             <CommandItem onSelect={() => go("/today")}>
               <Sun />
@@ -264,6 +393,16 @@ export function CommandBar({ children }: { children?: React.ReactNode }) {
           </CommandGroup>
         </CommandList>
       </CommandDialog>
+      <InviteDialog
+        open={inviteOpen}
+        onOpenChange={setInviteOpen}
+        draft={inviteDraft}
+      />
+      <ReplyDialog
+        open={replyOpen}
+        onOpenChange={setReplyOpen}
+        draft={replyDraft}
+      />
     </CommandBarContext.Provider>
   );
 }

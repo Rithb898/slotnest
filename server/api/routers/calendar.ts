@@ -23,6 +23,18 @@ import { corsairAccounts, corsairIntegrations } from "@/server/db/schema";
 /** A free-busy interval as returned by `getAvailability`. */
 type BusyInterval = { start: string; end: string };
 
+type CachedCalendarEvent = {
+  id?: string;
+  status?: "tentative" | "confirmed" | "cancelled";
+  htmlLink?: string;
+  summary?: string;
+  location?: string;
+  start?: { date?: string; dateTime?: string; timeZone?: string };
+  end?: { date?: string; dateTime?: string; timeZone?: string };
+  attendees?: { email?: string }[];
+  calendarId?: string;
+};
+
 /** Returns true if the signed-in tenant has a googlecalendar account. */
 async function isCalendarConnected(userId: string): Promise<boolean> {
   const rows = await db
@@ -36,10 +48,102 @@ async function isCalendarConnected(userId: string): Promise<boolean> {
   return rows.some((r) => r.name === "googlecalendar");
 }
 
+function normalizeCalendarEvent(
+  event: CachedCalendarEvent,
+  fallbackId: string,
+) {
+  return {
+    id: event.id ?? fallbackId,
+    summary: event.summary ?? "(no title)",
+    // All-day events use `date`; timed events use `dateTime`.
+    start: event.start?.dateTime ?? event.start?.date ?? null,
+    end: event.end?.dateTime ?? event.end?.date ?? null,
+    allDay: Boolean(event.start?.date && !event.start?.dateTime),
+    location: event.location ?? null,
+    htmlLink: event.htmlLink ?? null,
+    attendees: (event.attendees ?? [])
+      .map((a) => a.email)
+      .filter((x): x is string => Boolean(x)),
+    status: event.status,
+    calendarId: event.calendarId,
+  };
+}
+
+function eventOverlapsRange(
+  event: ReturnType<typeof normalizeCalendarEvent>,
+  timeMin: string,
+  timeMax: string,
+) {
+  const rangeStart = new Date(timeMin).getTime();
+  const rangeEnd = new Date(timeMax).getTime();
+  const start = event.start ? new Date(event.start).getTime() : Number.NaN;
+  const end = event.end ? new Date(event.end).getTime() : start;
+  if (!Number.isFinite(start)) return false;
+  return start < rangeEnd && (Number.isFinite(end) ? end : start) >= rangeStart;
+}
+
+async function getLiveEvents({
+  tenant,
+  timeMin,
+  timeMax,
+  timeZone,
+  maxResults,
+}: {
+  tenant: ReturnType<typeof corsair.withTenant>;
+  timeMin: string;
+  timeMax: string;
+  timeZone?: string;
+  maxResults: number;
+}) {
+  const res = await tenant.googlecalendar.api.events.getMany({
+    calendarId: "primary",
+    timeMin,
+    timeMax,
+    timeZone,
+    singleEvents: true,
+    orderBy: "startTime",
+    maxResults,
+  });
+
+  return (res.items ?? [])
+    .filter((e) => e.status !== "cancelled")
+    .map((e) => normalizeCalendarEvent(e, e.id ?? ""));
+}
+
+async function getCachedEvents({
+  tenant,
+  timeMin,
+  timeMax,
+  maxResults,
+}: {
+  tenant: ReturnType<typeof corsair.withTenant>;
+  timeMin: string;
+  timeMax: string;
+  maxResults: number;
+}) {
+  const rows = await tenant.googlecalendar.db.events.list({
+    limit: Math.max(250, maxResults),
+    offset: 0,
+  });
+
+  return rows
+    .map((row) => normalizeCalendarEvent(row.data, row.entity_id))
+    .filter((event) => event.status !== "cancelled")
+    .filter((event) => !event.calendarId || event.calendarId === "primary")
+    .filter((event) => eventOverlapsRange(event, timeMin, timeMax))
+    .sort(
+      (a, b) =>
+        new Date(a.start ?? 0).getTime() - new Date(b.start ?? 0).getTime(),
+    )
+    .slice(0, maxResults);
+}
+
 export const calendarRouter = createTRPCRouter({
   /**
-   * Events in a date range (defaults to the next 7 days). `singleEvents` +
-   * `orderBy: "startTime"` so recurring events are expanded and sorted.
+   * Events in a date range (defaults to the next 7 days). Reads prefer
+   * Corsair's tenant-scoped local DB; live API remains a read-through fallback
+   * for first-run/forced refresh because webhook subscription is intentionally
+   * not wired in this slice.
    */
   events: protectedProcedure
     .input(
@@ -49,6 +153,7 @@ export const calendarRouter = createTRPCRouter({
           timeMax: z.string().optional(),
           timeZone: z.string().optional(),
           maxResults: z.number().min(1).max(250).optional(),
+          forceFresh: z.boolean().optional(),
         })
         .optional(),
     )
@@ -60,32 +165,23 @@ export const calendarRouter = createTRPCRouter({
       const now = new Date();
       const weekOut = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
       const tenant = corsair.withTenant(ctx.session.user.id);
+      const timeMin = input?.timeMin ?? now.toISOString();
+      const timeMax = input?.timeMax ?? weekOut.toISOString();
+      const maxResults = input?.maxResults ?? 100;
 
-      const res = await tenant.googlecalendar.api.events.getMany({
-        calendarId: "primary",
-        timeMin: input?.timeMin ?? now.toISOString(),
-        timeMax: input?.timeMax ?? weekOut.toISOString(),
-        timeZone: input?.timeZone,
-        singleEvents: true,
-        orderBy: "startTime",
-        maxResults: input?.maxResults ?? 100,
-      });
-
-      const events = (res.items ?? [])
-        .filter((e) => e.status !== "cancelled")
-        .map((e) => ({
-          id: e.id ?? "",
-          summary: e.summary ?? "(no title)",
-          // All-day events use `date`; timed events use `dateTime`.
-          start: e.start?.dateTime ?? e.start?.date ?? null,
-          end: e.end?.dateTime ?? e.end?.date ?? null,
-          allDay: Boolean(e.start?.date && !e.start?.dateTime),
-          location: e.location ?? null,
-          htmlLink: e.htmlLink ?? null,
-          attendees: (e.attendees ?? [])
-            .map((a) => a.email)
-            .filter((x): x is string => Boolean(x)),
-        }));
+      const cached = input?.forceFresh
+        ? []
+        : await getCachedEvents({ tenant, timeMin, timeMax, maxResults });
+      const events =
+        cached.length > 0
+          ? cached
+          : await getLiveEvents({
+              tenant,
+              timeMin,
+              timeMax,
+              timeZone: input?.timeZone,
+              maxResults,
+            });
 
       return { connected: true as const, events };
     }),

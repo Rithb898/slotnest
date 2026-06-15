@@ -27,8 +27,8 @@ export type ReplyDraft = {
   to: string;
   subject: string;
   body: string;
-  messageId: string;
   threadId: string;
+  messageId?: string;
   inReplyTo?: string | null;
   references?: string | null;
 };

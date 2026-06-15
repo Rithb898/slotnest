@@ -6,8 +6,26 @@ import { conn } from "./db";
 
 export const corsair = createCorsair({
   plugins: [
-    gmail({ authType: "oauth_2" }),
-    googlecalendar({ authType: "oauth_2" }),
+    gmail({
+      authType: "oauth_2",
+      webhookHooks: {
+        messageChanged: {
+          after: async () => {
+            // Ingest-time seam for plan 007 triage and plan 008 embeddings.
+          },
+        },
+      },
+    }),
+    googlecalendar({
+      authType: "oauth_2",
+      webhookHooks: {
+        onEventChanged: {
+          after: async () => {
+            // Ingest-time seam for calendar-derived scheduling intelligence.
+          },
+        },
+      },
+    }),
   ],
   database: conn,
   kek: env.CORSAIR_KEK,

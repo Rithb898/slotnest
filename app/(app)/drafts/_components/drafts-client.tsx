@@ -245,7 +245,9 @@ export function DraftsClient() {
         open={replyOpen}
         onOpenChange={setReplyOpen}
         draft={replyDraft}
-        onSent={() => replyDraft && setState(replyDraft.messageId, "approved")}
+        onSent={() =>
+          replyDraft?.messageId && setState(replyDraft.messageId, "approved")
+        }
       />
       <InviteDialog
         open={inviteOpen}
