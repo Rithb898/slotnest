@@ -2,6 +2,7 @@ import { Agent, run } from "@openai/agents";
 import { z } from "zod";
 
 import { env } from "@/lib/config/env";
+import { TRIAGE_INSTRUCTIONS } from "@/lib/prompts";
 import { type Triage, type TriageInput, triage } from "@/lib/triage";
 
 export const TRIAGE_LLM_MODEL = "gpt-4.1-mini";
@@ -20,27 +21,6 @@ export type TriageClassification = {
 export type TriageLlmInput = TriageInput & {
   body?: string | null;
 };
-
-const TRIAGE_INSTRUCTIONS = `Classify one email for SlotNest.
-
-Return exactly one JSON object and no other text:
-{"action":"Needs reply|FYI|Ignore","urgency":"Urgent|Normal|Low"}
-
-Action labels:
-- Needs reply: the user likely needs to respond, decide, approve, schedule, review, or answer a direct question.
-- FYI: useful information, status, confirmation, or context that does not require a reply.
-- Ignore: promotions, newsletters, receipts, automated notices, social/forum updates, spam, or bulk mail.
-
-Urgency labels:
-- Urgent: time-sensitive, same-day, deadline, blocker, escalation, or important unread work.
-- Normal: actionable or useful, but not time-critical.
-- Low: bulk, ignorable, stale, or low-value information.
-
-Rules:
-- Use only the supplied email fields.
-- Do not invent facts.
-- Prefer Ignore + Low for bulk/promotional mail.
-- Prefer Needs reply when the sender asks the user a direct question or requests confirmation.`;
 
 function cleanModelOutput(text: string): string {
   return text

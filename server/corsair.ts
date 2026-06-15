@@ -76,3 +76,23 @@ export const corsair = createCorsair({
   kek: env.CORSAIR_KEK,
   multiTenancy: true,
 });
+
+/**
+ * Read-only Corsair instance for the Chat agent (plan 011 / ADR 0001).
+ *
+ * The agent holds only curated read tools, but as a structural backstop its
+ * Corsair runs in `readonly` permission mode: reads are allowed, every write
+ * and destructive op is denied at the platform layer
+ * (`docs/corsair/concepts/permissions.md`). Even an accidental write path is
+ * blocked, never silently executed. Same DB/KEK/tenant scoping as `corsair`;
+ * no webhook hooks (ingestion stays on the primary instance).
+ */
+export const corsairReadonly = createCorsair({
+  plugins: [
+    gmail({ authType: "oauth_2", permissions: { mode: "readonly" } }),
+    googlecalendar({ authType: "oauth_2", permissions: { mode: "readonly" } }),
+  ],
+  database: conn,
+  kek: env.CORSAIR_KEK,
+  multiTenancy: true,
+});

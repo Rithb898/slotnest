@@ -19,6 +19,7 @@ honor its STOP conditions, and update your row when done.
 | 008  | Hybrid search — Qdrant semantic + Postgres keyword | P1 | L | 006 | DONE (code complete: Qdrant collection-backed semantic embeddings with OpenAI `text-embedding-3-small`, webhook ingest upsert, backfill script, tenant-scoped `gmail.search` with Corsair keyword + Qdrant semantic merge, and ⌘K mail results. Postgres remains source of truth; no pgvector migration required. Gates: `pnpm add @qdrant/js-client-rest`, focused Biome clean, focused `tsc` via `/tmp/slotnest-tsconfig-008.json` passed. Full `tsc --noEmit` still fails on unrelated `convix-pr-agency-hero` missing Vite deps.) |
 | 009  | Agent propose → approve → execute (hero "one sentence" flow) | P2 | M | 004 | DONE (code complete: `agent.ask` now returns Zod-validated structured invite/reply proposals via Agents SDK `outputType`; ⌘K renders approval cards; Approve opens the existing `InviteDialog` / `ReplyDialog`, so actual writes still go through `calendar.createEvent` / `gmail.sendReply` behind a human keypress. Gates: focused Biome clean on touched files; `pnpm exec tsc --noEmit` only fails on unrelated `convix-pr-agency-hero` missing Vite deps. `build`/`dev` not run per repo instruction.) |
 | 010  | AI-native daily workspace and retention loop | P0 | L | 003, 004, 005, 009 | TODO |
+| 011  | Chat — the conversational AI agent (`/chat`) | P0 | L | 004, 005, 008, 009 | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 

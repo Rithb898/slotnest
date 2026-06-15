@@ -4,7 +4,8 @@ import { env } from "@/lib/config/env";
 
 export const MESSAGE_EMBEDDING_MODEL = "text-embedding-3-small";
 export const MESSAGE_EMBEDDINGS_COLLECTION = "slotnest_messages";
-const MESSAGE_EMBEDDING_DIMENSIONS = 1536;
+export const EMBEDDING_DIMENSIONS = 1536;
+const MESSAGE_EMBEDDING_DIMENSIONS = EMBEDDING_DIMENSIONS;
 
 type EmbeddableGmailMessage = {
   subject?: string | null;
@@ -36,7 +37,7 @@ export type MessageSemanticSearchHit = {
 let qdrantClient: QdrantClient | null = null;
 let collectionReady = false;
 
-function getQdrantClient(): QdrantClient | null {
+export function getQdrantClient(): QdrantClient | null {
   if (!env.QDRANT_URL) return null;
   const qdrantUrl = new URL(env.QDRANT_URL);
   qdrantClient ??= new QdrantClient({
@@ -53,7 +54,7 @@ function getQdrantClient(): QdrantClient | null {
   return qdrantClient;
 }
 
-function pointIdFromEntityId(entityId: string): string {
+export function pointIdFromEntityId(entityId: string): string {
   const bytes = createHash("sha256").update(entityId).digest().subarray(0, 16);
   bytes[6] = (bytes[6] & 0x0f) | 0x50;
   bytes[8] = (bytes[8] & 0x3f) | 0x80;

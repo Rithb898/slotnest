@@ -6,6 +6,7 @@ import {
   FileText,
   Inbox,
   LogOut,
+  MessageSquare,
   Monitor,
   Moon,
   Plug,
@@ -64,6 +65,7 @@ type NavItem = {
 
 const PRIMARY: NavItem[] = [
   { href: "/today", label: "Today", icon: Sun, shortcut: "G T" },
+  { href: "/chat", label: "Chat", icon: MessageSquare, shortcut: "G A" },
   { href: "/inbox", label: "Inbox", icon: Inbox, shortcut: "G I" },
   { href: "/calendar", label: "Calendar", icon: CalendarDays, shortcut: "G C" },
   { href: "/drafts", label: "Drafts", icon: FileText, shortcut: "G D" },
@@ -195,14 +197,14 @@ export function AppSidebar() {
   return (
     <>
       {/* Desktop rail */}
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-border bg-[var(--sidebar)] md:flex">
+      <aside className="hidden w-60 shrink-0 flex-col border-r border-border bg-sidebar md:flex">
         <div className="flex items-center px-4 py-4">
           <Link
             href="/today"
             className="flex items-center gap-2 text-base font-semibold tracking-tight"
           >
             <Avatar className="size-6 rounded-md">
-              <AvatarFallback className="rounded-md bg-primary text-[var(--primary-foreground)]">
+              <AvatarFallback className="rounded-md bg-primary text-primary-foreground">
                 <Sun className="size-3.5" />
               </AvatarFallback>
             </Avatar>
@@ -282,7 +284,7 @@ export function AppSidebar() {
       </aside>
 
       {/* Mobile bottom bar */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex border-t border-border bg-[var(--sidebar)] md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-40 flex border-t border-border bg-sidebar md:hidden">
         {PRIMARY.map((item) => {
           const active = isActive(pathname, item.href);
           const Icon = item.icon;
@@ -301,7 +303,7 @@ export function AppSidebar() {
               href={item.href}
               className={cn(
                 "flex min-h-[44px] flex-1 flex-col items-center justify-center gap-0.5 py-2 text-xs",
-                active ? "text-[var(--honey-ink)]" : "text-muted-foreground",
+                active ? "text-honey-ink" : "text-muted-foreground",
               )}
               aria-current={active ? "page" : undefined}
             >
@@ -364,7 +366,7 @@ function SidebarLink({
       className={cn(
         "group relative flex min-h-[44px] items-center gap-3 rounded-md px-3 py-2 text-[0.9375rem] font-semibold leading-none transition-colors",
         active
-          ? "bg-accent text-[var(--honey-ink)]"
+          ? "bg-accent text-honey-ink"
           : "text-foreground hover:bg-accent",
       )}
       aria-current={active ? "page" : undefined}
@@ -433,7 +435,7 @@ function CountBadge({
           ? "bg-muted text-muted-foreground"
           : urgent
             ? "bg-urgent-subtle text-urgent"
-            : "bg-primary/15 text-[var(--honey-ink)]",
+            : "bg-primary/15 text-honey-ink",
       )}
       aria-label={
         tone === "muted"
@@ -557,14 +559,14 @@ function AccountMenu({
             <span className="relative">
               <Avatar className="size-5 shrink-0 rounded-full">
                 <AvatarImage src={avatarUrl} alt={name} />
-                <AvatarFallback className="rounded-full bg-primary/15 text-[0.625rem] font-semibold text-[var(--honey-ink)]">
+                <AvatarFallback className="rounded-full bg-primary/15 text-[0.625rem] font-semibold text-honey-ink">
                   {initials}
                 </AvatarFallback>
               </Avatar>
               {needsConnect ? (
                 <span
                   className={cn(
-                    "absolute -right-0.5 -top-0.5 size-2 rounded-full ring-2 ring-[var(--sidebar)]",
+                    "absolute -right-0.5 -top-0.5 size-2 rounded-full ring-2 ring-sidebar",
                     health === "none" ? "bg-urgent" : "bg-primary",
                   )}
                   aria-hidden
@@ -577,7 +579,7 @@ function AccountMenu({
           <>
             <Avatar className="size-7 shrink-0 rounded-md">
               <AvatarImage src={avatarUrl} alt={name} />
-              <AvatarFallback className="rounded-md bg-primary/15 text-xs font-semibold text-[var(--honey-ink)]">
+              <AvatarFallback className="rounded-md bg-primary/15 text-xs font-semibold text-honey-ink">
                 {initials}
               </AvatarFallback>
             </Avatar>

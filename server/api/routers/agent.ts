@@ -2,6 +2,7 @@ import { OpenAIAgentsProvider } from "@corsair-dev/mcp";
 import { Agent, run, tool } from "@openai/agents";
 import { z } from "zod";
 import { env } from "@/lib/config/env";
+import { AGENT_ASK_INSTRUCTIONS } from "@/lib/prompts";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { corsair } from "@/server/corsair";
 
@@ -32,7 +33,7 @@ import { corsair } from "@/server/corsair";
  * user to act on through the existing approve-first UI.
  */
 
-const inviteProposalSchema = z.object({
+export const inviteProposalSchema = z.object({
   kind: z.literal("invite"),
   summary: z.string().min(1),
   start: z.string().min(1),
@@ -41,7 +42,7 @@ const inviteProposalSchema = z.object({
   description: z.string().optional(),
 });
 
-const replyProposalSchema = z.object({
+export const replyProposalSchema = z.object({
   kind: z.literal("reply"),
   to: z.string().email(),
   subject: z.string().min(1),
@@ -52,37 +53,83 @@ const replyProposalSchema = z.object({
   references: z.string().min(1).optional(),
 });
 
+// The CLEAN, validated proposal shape used everywhere except the model output
+// (stored rows, tRPC return types, UI). A discriminated union is fine here — it
+// is never sent to OpenAI.
 const agentProposalSchema = z.discriminatedUnion("kind", [
   inviteProposalSchema,
   replyProposalSchema,
 ]);
 
-const agentOutputSchema = z.object({
-  text: z.string().min(1),
-  proposals: z.array(agentProposalSchema).max(4).default([]),
+export type AgentProposal = z.infer<typeof agentProposalSchema>;
+
+/**
+ * Agent OUTPUT proposal schemas. OpenAI structured outputs (strict) reject
+ * `oneOf` — what a Zod discriminated union compiles to — and forbid optional
+ * fields. So the model sees an `anyOf` (`z.union`) of two branches whose
+ * optional fields are `.nullable()` instead, per the OpenAI guide. We validate
+ * the chosen branch back into a clean `AgentProposal` with `toAgentProposal`.
+ */
+const inviteOutputSchema = z.object({
+  kind: z.literal("invite"),
+  summary: z.string(),
+  start: z.string(),
+  end: z.string(),
+  attendees: z.array(z.string()).nullable(),
+  description: z.string().nullable(),
 });
 
-export type AgentProposal = z.infer<typeof agentProposalSchema>;
+const replyOutputSchema = z.object({
+  kind: z.literal("reply"),
+  to: z.string(),
+  subject: z.string(),
+  body: z.string(),
+  threadId: z.string().nullable(),
+  messageId: z.string().nullable(),
+  inReplyTo: z.string().nullable(),
+  references: z.string().nullable(),
+});
+
+export const proposalOutputUnion = z.union([
+  inviteOutputSchema,
+  replyOutputSchema,
+]);
+export type ProposalOutput = z.infer<typeof proposalOutputUnion>;
+
+/** Validate one model-emitted proposal into a clean AgentProposal, or drop it. */
+export function toAgentProposal(out: ProposalOutput): AgentProposal | null {
+  if (out.kind === "invite") {
+    const parsed = inviteProposalSchema.safeParse({
+      kind: "invite",
+      summary: out.summary,
+      start: out.start,
+      end: out.end,
+      attendees: out.attendees ?? [],
+      description: out.description ?? undefined,
+    });
+    return parsed.success ? parsed.data : null;
+  }
+  const parsed = replyProposalSchema.safeParse({
+    kind: "reply",
+    to: out.to,
+    subject: out.subject,
+    body: out.body,
+    threadId: out.threadId ?? undefined,
+    messageId: out.messageId ?? undefined,
+    inReplyTo: out.inReplyTo ?? undefined,
+    references: out.references ?? undefined,
+  });
+  return parsed.success ? parsed.data : null;
+}
+
+const agentOutputSchema = z.object({
+  text: z.string(),
+  proposals: z.array(proposalOutputUnion),
+});
 
 export type AgentResult =
   | { configured: false; text: string; proposals: [] }
   | { configured: true; text: string; proposals: AgentProposal[] };
-
-const INSTRUCTIONS = `You are SlotNest's assistant for a Gmail + Google Calendar workspace.
-You have Corsair tools: use list_operations to discover APIs, get_schema to learn arguments, and run_script to read data.
-The connected plugins are "gmail" and "googlecalendar". Always reference resources by ID.
-
-STRICT RULES:
-- READ ONLY. You may inspect email and calendar data (e.g. gmail.api.messages.list/get, googlecalendar.api.events.getMany, googlecalendar.api.calendar.getAvailability).
-- NEVER perform a write: do not send email, create/update/delete events, or change any state. Do not call any operation whose risk is "write".
-- If the user asks to send, reply, schedule, book, or invite, DO NOT do it. Instead, gather the relevant details (proposed time, attendees, free slots) and return proposals the user can approve in the app.
-- Return structured output with:
-  - text: concise plain text for a small result panel.
-  - proposals: zero or more proposed actions.
-- For invite proposals, include ISO datetime strings for start/end, a title, and attendee email addresses.
-- For reply proposals, include to, subject, body, and include threadId/messageId/inReplyTo/references when known from Gmail.
-- If one sentence implies both a calendar invite and an email, return both proposals.
-- If required details are missing, explain what is missing in text and omit that proposal.`;
 
 export const agentRouter = createTRPCRouter({
   ask: protectedProcedure
@@ -108,7 +155,7 @@ export const agentRouter = createTRPCRouter({
       const agent = new Agent({
         name: "slotnest-agent",
         model: "gpt-4.1-mini",
-        instructions: INSTRUCTIONS,
+        instructions: AGENT_ASK_INSTRUCTIONS,
         tools,
         outputType: agentOutputSchema,
       });
@@ -118,10 +165,13 @@ export const agentRouter = createTRPCRouter({
         text: "(no response)",
         proposals: [],
       };
+      const proposals = output.proposals
+        .map(toAgentProposal)
+        .filter((p): p is AgentProposal => p !== null);
       return {
         configured: true,
         text: output.text,
-        proposals: output.proposals,
+        proposals,
       };
     }),
 });

@@ -7,6 +7,7 @@ import {
   Inbox,
   Loader2,
   Mail,
+  MessageSquare,
   PenLine,
   Plug,
   Search,
@@ -63,6 +64,7 @@ type CommandBarContextValue = {
 /** `g`-prefixed jump targets — mirrors the hints shown in the bar + sidebar. */
 const GOTO: Record<string, Route> = {
   t: "/today",
+  a: "/chat",
   i: "/inbox",
   c: "/calendar",
   d: "/drafts",
@@ -416,6 +418,11 @@ export function CommandBar({ children }: { children?: React.ReactNode }) {
               <Sun />
               <span>Today</span>
               <CommandShortcut>g t</CommandShortcut>
+            </CommandItem>
+            <CommandItem onSelect={() => go("/chat")}>
+              <MessageSquare />
+              <span>Chat</span>
+              <CommandShortcut>g a</CommandShortcut>
             </CommandItem>
             <CommandItem onSelect={() => go("/inbox")}>
               <Inbox />

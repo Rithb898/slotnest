@@ -11,7 +11,16 @@ import {
   toDate,
 } from "@/lib/gmail";
 import { buildRfc2822ReplyRaw } from "@/lib/gmail-reply-raw";
-import { searchMessageEmbeddings } from "@/lib/message-embeddings";
+import {
+  ensureMessageEmbeddingStore,
+  getQdrantClient,
+  MESSAGE_EMBEDDINGS_COLLECTION,
+  pointIdFromEntityId,
+  searchMessageEmbeddings,
+  upsertMessageEmbedding,
+} from "@/lib/message-embeddings";
+import { DRAFT_REPLY_INSTRUCTIONS } from "@/lib/prompts";
+import { upsertSentEmbedding } from "@/lib/sent-embeddings";
 import { type Triage, triage } from "@/lib/triage";
 import { classifyTriage } from "@/lib/triage-llm";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
@@ -175,16 +184,6 @@ type GmailSearchResult = {
 
 /** Model used for drafts — stored on each row so prompt/model bumps invalidate. */
 const DRAFT_MODEL = "gpt-4.1-mini";
-
-const DRAFT_REPLY_INSTRUCTIONS = `You write concise plain-text email replies for SlotNest.
-
-Rules:
-- Draft only the reply body. Do not include a subject line, greeting labels, markdown, or code fences.
-- Be neutral, professional, and specific to the message.
-- Keep it short: 2-5 sentences unless the email clearly needs less.
-- Do not invent commitments, dates, attachments, or facts not present in the email.
-- If the message asks for scheduling and no availability is provided, ask for a suitable time or say you will coordinate timing.
-- The user will review and edit before sending.`;
 
 function stripHtml(html: string): string {
   return html
@@ -533,6 +532,70 @@ async function getSemanticSearchMessages({
   });
 }
 
+/**
+ * Embed-on-sync: ensure the inbox messages just loaded are in the semantic
+ * store, without re-embedding ones already there. Since webhooks are disabled,
+ * this is the live ingestion path for received mail (plan 011) — it runs
+ * fire-and-forget from `inbox` so it never slows or breaks the read. Only
+ * messages present in the local cache (`corsair_entities`) are embeddable;
+ * live-only messages get embedded on a later load once cached.
+ */
+async function embedNewInboxMessages(
+  userId: string,
+  gmailMessageIds: string[],
+): Promise<void> {
+  const client = getQdrantClient();
+  if (!env.OPENAI_API_KEY || !client || gmailMessageIds.length === 0) return;
+  if (!(await ensureMessageEmbeddingStore())) return;
+
+  const rows = await db
+    .select({
+      id: corsairEntities.id,
+      gmailMessageId: corsairEntities.entityId,
+      data: corsairEntities.data,
+    })
+    .from(corsairEntities)
+    .innerJoin(
+      corsairAccounts,
+      eq(corsairEntities.accountId, corsairAccounts.id),
+    )
+    .innerJoin(
+      corsairIntegrations,
+      eq(corsairAccounts.integrationId, corsairIntegrations.id),
+    )
+    .where(
+      and(
+        inArray(corsairEntities.entityId, gmailMessageIds),
+        eq(corsairAccounts.tenantId, userId),
+        eq(corsairIntegrations.name, "gmail"),
+        eq(corsairEntities.entityType, "messages"),
+      ),
+    );
+  if (rows.length === 0) return;
+
+  // Skip messages already embedded (idempotent point id = hash of entity id).
+  const existing = await client.retrieve(MESSAGE_EMBEDDINGS_COLLECTION, {
+    ids: rows.map((row) => pointIdFromEntityId(row.id)),
+    with_payload: false,
+    with_vector: false,
+  });
+  const have = new Set(existing.map((point) => String(point.id)));
+
+  for (const row of rows) {
+    if (have.has(pointIdFromEntityId(row.id))) continue;
+    try {
+      await upsertMessageEmbedding({
+        tenantId: userId,
+        entityId: row.id,
+        gmailMessageId: row.gmailMessageId,
+        message: row.data as CachedGmailMessage,
+      });
+    } catch (error) {
+      console.warn("Embed-on-sync failed for a message:", error);
+    }
+  }
+}
+
 export const gmailRouter = createTRPCRouter({
   search: protectedProcedure
     .input(
@@ -658,6 +721,15 @@ export const gmailRouter = createTRPCRouter({
         }),
       );
 
+      // Live ingestion for received mail (webhooks are off). Fire-and-forget so
+      // the inbox response never waits on — or fails because of — embedding.
+      void embedNewInboxMessages(
+        ctx.session.user.id,
+        source.messages.map((m) => m.id),
+      ).catch((error) => {
+        console.warn("Embed-on-sync batch failed:", error);
+      });
+
       return {
         connected: true as const,
         messages,
@@ -734,6 +806,24 @@ export const gmailRouter = createTRPCRouter({
         }),
         threadId: input.threadId,
       });
+
+      // Embed the just-sent reply into the user-voice store so future drafts
+      // reflect it — no webhook, no backfill re-run needed (plan 011). Best
+      // effort: a failure here must never block the send.
+      if (sent.id) {
+        try {
+          await upsertSentEmbedding({
+            tenantId: userId,
+            entityId: `${userId}:${sent.id}`,
+            to: input.to,
+            subject: input.subject,
+            text: input.body,
+            date: new Date().toISOString(),
+          });
+        } catch (error) {
+          console.warn("Failed to embed sent reply for voice store:", error);
+        }
+      }
 
       // Keep the draft cache in sync with what was actually sent.
       if (input.messageId) {

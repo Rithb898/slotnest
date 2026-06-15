@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { env } from "@/lib/config/env";
+import { DAILY_BRIEF_INSTRUCTIONS } from "@/lib/prompts";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { db } from "@/server/db";
 import { dailyBrief as dailyBriefTable } from "@/server/db/schema";
@@ -40,15 +41,6 @@ const dailyBriefInput = z.object({
     })
     .nullable(),
 });
-
-const BRIEF_INSTRUCTIONS = `Write SlotNest daily workspace briefs.
-
-Rules:
-- Use only the supplied structured data.
-- One short paragraph, 18-35 words.
-- Mention the highest-value sender or scheduling opportunity when present.
-- Plain text only. No markdown, no greeting, no fake facts.
-- The product is draft-then-approve: say "prepared" or "ready", never imply anything was sent or booked.`;
 
 function deterministicBrief(input: z.infer<typeof dailyBriefInput>): string {
   const top = input.topMessages[0];
@@ -161,7 +153,7 @@ export const workspaceRouter = createTRPCRouter({
       const agent = new Agent({
         name: "slotnest-daily-brief",
         model: BRIEF_MODEL,
-        instructions: BRIEF_INSTRUCTIONS,
+        instructions: DAILY_BRIEF_INSTRUCTIONS,
       });
 
       const result = await run(
