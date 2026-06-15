@@ -77,7 +77,10 @@ export function CalendarClient() {
     return { timeMin: min.toISOString(), timeMax: max.toISOString() };
   }, [selectedDay]);
 
-  const eventsQuery = api.calendar.events.useQuery(range, CALENDAR_POLL_OPTIONS);
+  const eventsQuery = api.calendar.events.useQuery(
+    range,
+    CALENDAR_POLL_OPTIONS,
+  );
   const availabilityQuery = api.calendar.availability.useQuery(
     range,
     CALENDAR_POLL_OPTIONS,

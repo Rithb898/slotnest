@@ -16,7 +16,7 @@ export function LenisProvider({ children }: { children: ReactNode }) {
         smoothWheel: true,
       }}
     >
-      <MotionConfig >{children}</MotionConfig>
+      <MotionConfig>{children}</MotionConfig>
     </ReactLenis>
   );
 }

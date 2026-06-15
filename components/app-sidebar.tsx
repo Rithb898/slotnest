@@ -365,9 +365,7 @@ function SidebarLink({
       href={item.href}
       className={cn(
         "group relative flex min-h-[44px] items-center gap-3 rounded-md px-3 py-2 text-[0.9375rem] font-semibold leading-none transition-colors",
-        active
-          ? "bg-accent text-honey-ink"
-          : "text-foreground hover:bg-accent",
+        active ? "bg-accent text-honey-ink" : "text-foreground hover:bg-accent",
       )}
       aria-current={active ? "page" : undefined}
       title={
