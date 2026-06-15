@@ -38,9 +38,17 @@ let collectionReady = false;
 
 function getQdrantClient(): QdrantClient | null {
   if (!env.QDRANT_URL) return null;
+  const qdrantUrl = new URL(env.QDRANT_URL);
   qdrantClient ??= new QdrantClient({
-    url: env.QDRANT_URL,
+    host: qdrantUrl.hostname,
+    port: qdrantUrl.port
+      ? Number.parseInt(qdrantUrl.port, 10)
+      : qdrantUrl.protocol === "https:"
+        ? 443
+        : 6333,
+    https: qdrantUrl.protocol === "https:",
     ...(env.QDRANT_API_KEY ? { apiKey: env.QDRANT_API_KEY } : {}),
+    checkCompatibility: false,
   });
   return qdrantClient;
 }
@@ -62,14 +70,21 @@ function pointIdFromEntityId(entityId: string): string {
 async function ensureMessageCollection(client: QdrantClient): Promise<void> {
   if (collectionReady) return;
 
-  const exists = await client.collectionExists(MESSAGE_EMBEDDINGS_COLLECTION);
-  if (!exists.exists) {
-    await client.createCollection(MESSAGE_EMBEDDINGS_COLLECTION, {
-      vectors: {
-        size: MESSAGE_EMBEDDING_DIMENSIONS,
-        distance: "Cosine",
-      },
-    });
+  try {
+    const exists = await client.collectionExists(MESSAGE_EMBEDDINGS_COLLECTION);
+    if (!exists.exists) {
+      await client.createCollection(MESSAGE_EMBEDDINGS_COLLECTION, {
+        vectors: {
+          size: MESSAGE_EMBEDDING_DIMENSIONS,
+          distance: "Cosine",
+        },
+      });
+    }
+  } catch (error) {
+    throw new Error(
+      `Qdrant is not reachable at ${env.QDRANT_URL}. Check that the Qdrant endpoint is running and reachable from this machine.`,
+      { cause: error },
+    );
   }
 
   collectionReady = true;
@@ -124,6 +139,14 @@ export async function createTextEmbedding(input: string): Promise<number[]> {
   return embedding;
 }
 
+export async function ensureMessageEmbeddingStore(): Promise<boolean> {
+  const client = getQdrantClient();
+  if (!env.OPENAI_API_KEY || !client) return false;
+
+  await ensureMessageCollection(client);
+  return true;
+}
+
 export async function upsertMessageEmbedding({
   tenantId,
   entityId,
@@ -139,8 +162,8 @@ export async function upsertMessageEmbedding({
   const client = getQdrantClient();
   if (!input || !env.OPENAI_API_KEY || !client) return false;
 
-  const embedding = await createTextEmbedding(input);
   await ensureMessageCollection(client);
+  const embedding = await createTextEmbedding(input);
   await client.upsert(MESSAGE_EMBEDDINGS_COLLECTION, {
     wait: true,
     points: [
@@ -174,8 +197,8 @@ export async function searchMessageEmbeddings({
   const client = getQdrantClient();
   if (!env.OPENAI_API_KEY || !client) return [];
 
-  const embedding = await createTextEmbedding(query);
   await ensureMessageCollection(client);
+  const embedding = await createTextEmbedding(query);
   const results = await client.search(MESSAGE_EMBEDDINGS_COLLECTION, {
     vector: embedding,
     limit,
