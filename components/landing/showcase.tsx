@@ -28,7 +28,7 @@ export function Showcase() {
 
 function InboxMockup() {
   return (
-    <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-[0_24px_70px_-30px_rgba(0,0,0,0.35)]">
+    <div className="group overflow-hidden rounded-3xl border border-border bg-card shadow-[0_24px_70px_-30px_rgba(0,0,0,0.35)] transition-transform duration-500 hover:-translate-y-1 hover:shadow-[0_30px_80px_-34px_rgba(0,0,0,0.38)]">
       {/* window chrome */}
       <div className="flex items-center gap-2 border-b border-border bg-secondary/50 px-4 py-3">
         <span className="size-3 rounded-full bg-border" />
@@ -138,7 +138,7 @@ function TriageRow({
 }: RowProps) {
   return (
     <div
-      className={`relative flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors ${
+      className={`relative flex items-center gap-3 rounded-xl px-3 py-2.5 transition-[transform,background-color] duration-300 group-hover:translate-x-0.5 ${
         active ? "bg-[oklch(0.98_0.012_78)]" : "hover:bg-secondary/60"
       }`}
     >

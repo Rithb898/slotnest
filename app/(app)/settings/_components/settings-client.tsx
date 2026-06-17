@@ -313,7 +313,7 @@ function BillingPanel({ billing }: { billing: BillingSummary }) {
             <div>
               <CardTitle>Billing</CardTitle>
               <CardDescription>
-                Plan status and the hosted Razorpay subscription flow.
+                Plan status and Razorpay subscription checkout.
               </CardDescription>
             </div>
             <Badge variant="ghost">{subscriptionLabel}</Badge>
@@ -345,7 +345,7 @@ function BillingPanel({ billing }: { billing: BillingSummary }) {
                 {subscription?.trialEnd
                   ? `Trial ends ${formatDate(subscription.trialEnd)}`
                   : subscription?.status === "created"
-                    ? "Opening Razorpay checkout in a popup."
+                    ? "Ready for Razorpay checkout."
                     : subscription?.status === "paused"
                       ? "Subscription is paused in Razorpay."
                       : subscription?.status === "pending"

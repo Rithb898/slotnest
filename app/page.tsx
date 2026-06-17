@@ -11,7 +11,7 @@ import { TypeMoment } from "@/components/landing/type-moment";
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen flex-col bg-white text-foreground">
+    <div className="flex min-h-screen flex-col overflow-x-hidden bg-white text-foreground">
       <Hero />
       {/* <StatBand /> */}
 

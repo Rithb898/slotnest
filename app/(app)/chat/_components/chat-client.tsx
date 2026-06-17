@@ -1,12 +1,29 @@
 "use client";
 
-import { CalendarPlus, Loader2, Mail, Send, Sparkles } from "lucide-react";
+import {
+  CalendarPlus,
+  History,
+  Loader2,
+  Mail,
+  MessageSquarePlus,
+  Send,
+  Sparkles,
+} from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { InviteDialog, type InviteDraft } from "@/components/invite-dialog";
 import { ReplyDialog, type ReplyDraft } from "@/components/reply-dialog";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import type { RouterOutputs } from "@/trpc/react";
 import { api } from "@/trpc/react";
@@ -42,6 +59,17 @@ function formatDate(value: Date | string | null): string {
   }).format(date);
 }
 
+function formatHistoryDate(value: Date | string): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+}
+
 function formatDateTime(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
@@ -69,6 +97,7 @@ export function ChatClient() {
   const [replyDraft, setReplyDraft] = useState<ReplyDraft | null>(null);
   const [replyOpen, setReplyOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const conversations = api.chat.conversations.useQuery();
 
   const history = api.chat.messages.useQuery(
     { conversationId: conversationId ?? "" },
@@ -115,9 +144,24 @@ export function ChatClient() {
             ...prev,
             ...res.messages.filter((m) => m.role === "assistant"),
           ]);
+          void conversations.refetch();
         },
       },
     );
+  }
+
+  function openConversation(id: string) {
+    if (id === conversationId) return;
+    setConversationId(id);
+    setMessages([]);
+    router.replace(`/chat?c=${id}`);
+  }
+
+  function newChat() {
+    setConversationId(null);
+    setMessages([]);
+    setInput("");
+    router.replace("/chat");
   }
 
   function approve(proposal: Proposal) {
@@ -149,6 +193,65 @@ export function ChatClient() {
 
   return (
     <div className="mx-auto flex h-full max-w-2xl flex-col">
+      <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+        <div className="min-w-0">
+          <h1 className="truncate text-sm font-semibold">Ask SlotNest</h1>
+          <p className="truncate text-xs text-muted-foreground">
+            {conversationId ? "Saved chat" : "New chat"}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button type="button" variant="outline" size="sm">
+                  <History className="size-4" />
+                  History
+                </Button>
+              }
+            />
+            <DropdownMenuContent align="end" className="w-72">
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>Chat history</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {conversations.isLoading ? (
+                  <DropdownMenuItem disabled>
+                    <Loader2 className="size-4 animate-spin" />
+                    Loading chats
+                  </DropdownMenuItem>
+                ) : conversations.data && conversations.data.length > 0 ? (
+                  conversations.data.map((conversation) => (
+                    <DropdownMenuItem
+                      key={conversation.id}
+                      onClick={() => openConversation(conversation.id)}
+                      className={cn(
+                        "items-start",
+                        conversation.id === conversationId && "bg-accent",
+                      )}
+                    >
+                      <MessageSquarePlus className="mt-0.5 size-4" />
+                      <span className="min-w-0">
+                        <span className="block truncate">
+                          {conversation.title || "Untitled chat"}
+                        </span>
+                        <span className="block text-xs text-muted-foreground">
+                          {formatHistoryDate(conversation.updatedAt)}
+                        </span>
+                      </span>
+                    </DropdownMenuItem>
+                  ))
+                ) : (
+                  <DropdownMenuItem disabled>No saved chats</DropdownMenuItem>
+                )}
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button type="button" variant="secondary" size="sm" onClick={newChat}>
+            <MessageSquarePlus className="size-4" />
+            New
+          </Button>
+        </div>
+      </header>
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6">
         {isEmpty ? (
           <div className="flex h-full flex-col items-center justify-center gap-6 text-center">

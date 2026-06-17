@@ -142,7 +142,7 @@ function FeatureFold({
 
 function Panel({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-4 shadow-[0_18px_50px_-28px_rgba(0,0,0,0.4)]">
+    <div className="rounded-2xl border border-border bg-card p-4 shadow-[0_18px_50px_-28px_rgba(0,0,0,0.4)] transition-transform duration-300 hover:-translate-y-1 hover:shadow-[0_24px_60px_-30px_rgba(0,0,0,0.42)]">
       {children}
     </div>
   );

@@ -21,7 +21,7 @@ export async function signInWithEmail(formData: FormData) {
     return { error: result.error.message || "Sign in failed" };
   }
 
-  redirect("/");
+  redirect("/today");
 }
 
 export async function signUpWithEmail(formData: FormData) {
@@ -44,7 +44,7 @@ export async function signUpWithEmail(formData: FormData) {
     return { error: result.error.message || "Sign up failed" };
   }
 
-  redirect("/");
+  redirect("/today");
 }
 
 export async function requestPasswordReset(formData: FormData) {

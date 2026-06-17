@@ -63,12 +63,12 @@ export function SignupForm({
           name: value.name,
           email: value.email,
           password: value.password,
-          callbackURL: "/",
+          callbackURL: "/today",
         },
         {
           onSuccess: () => {
             toast.success("Account created");
-            router.push("/");
+            router.push("/today");
           },
           onError: (ctx) => {
             if (ctx.error.code === "PASSWORD_COMPROMISED") {

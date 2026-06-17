@@ -4,6 +4,7 @@ import { Menu, X } from "lucide-react";
 import { motion } from "motion/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { SlotNestLogo } from "@/components/slotnest-logo";
 import { cn } from "@/lib/utils";
 
 const LINKS = [
@@ -58,23 +59,13 @@ export function SiteNav() {
         {/* Left: Logo */}
         <Link
           href="/"
-          className="flex items-center gap-2.5 rounded-md font-sans font-bold tracking-tight text-[#2c2c2c] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+          className="flex items-center rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
         >
-          <svg
-            className="size-6 text-[#2c2c2c] shrink-0"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-          >
-            <title>SlotNest Logo</title>
-            <path
-              d="M12 3v18M3 12h18M5.636 5.636l12.728 12.728M5.636 19.364L18.364 5.636"
-              strokeLinecap="round"
-            />
-            <circle cx="12" cy="12" r="2.5" fill="currentColor" />
-          </svg>
-          <span className="text-[1.1rem]">SlotNest</span>
+          <SlotNestLogo
+            className="text-[#2c2c2c]"
+            markClassName="size-6"
+            wordmarkClassName="text-[1.05rem]"
+          />
         </Link>
 
         {/* Center: links — separate pills at top, merged into one bar on scroll.

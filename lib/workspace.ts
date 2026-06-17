@@ -11,6 +11,8 @@ export type WorkspaceMessage = {
   snippet: string;
   date: Date | string | null;
   unread?: boolean;
+  replyStatus?: "generated" | "edited" | "sent" | string | null;
+  replyBody?: string | null;
   triage: Triage;
 };
 

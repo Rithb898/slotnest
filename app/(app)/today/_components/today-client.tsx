@@ -77,6 +77,7 @@ function greetingFor(hour: number): string {
 
 export function TodayClient() {
   const router = useRouter();
+  const utils = api.useUtils();
   const { data: session } = authClient.useSession();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [actionStates, setActionStates] = useState<Record<string, ActionState>>(
@@ -139,6 +140,7 @@ export function TodayClient() {
     if (!inbox.data) return [];
     return inbox.data.messages
       .filter((message) => message.triage.action === "Needs reply")
+      .filter((message) => message.replyStatus !== "sent")
       .filter((message) => actionStates[message.id] !== "skipped")
       .sort((a, b) => triagePriority(b.triage) - triagePriority(a.triage))
       .slice(0, 8);
@@ -172,6 +174,23 @@ export function TodayClient() {
   const requestedDrafts = useRef<Set<string>>(new Set());
   const draftFor = draftReply.mutateAsync;
   const selectedDraftId = selected?.id ?? null;
+  useEffect(() => {
+    if (queue.length === 0) return;
+    setAiDrafts((current) => {
+      let changed = false;
+      const next = { ...current };
+      for (const message of queue) {
+        const body = message.replyBody?.trim();
+        if (!body) continue;
+        requestedDrafts.current.add(message.id);
+        if (next[message.id] === body) continue;
+        next[message.id] = body;
+        changed = true;
+      }
+      return changed ? next : current;
+    });
+  }, [queue]);
+
   useEffect(() => {
     const id = selectedDraftId;
     if (!id || !gmailConnected || requestedDrafts.current.has(id)) return;
@@ -445,9 +464,12 @@ export function TodayClient() {
         open={replyOpen}
         onOpenChange={setReplyOpen}
         draft={replyDraft}
-        onSent={() =>
-          replyDraft?.messageId && setAction(replyDraft.messageId, "approved")
-        }
+        onSent={() => {
+          if (replyDraft?.messageId) {
+            setAction(replyDraft.messageId, "approved");
+          }
+          void utils.gmail.inbox.invalidate();
+        }}
       />
       <InviteDialog
         open={inviteOpen}

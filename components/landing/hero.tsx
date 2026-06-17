@@ -26,9 +26,9 @@ export function Hero() {
       <section className="relative flex min-h-[calc(100vh-24px)] w-full flex-col overflow-hidden rounded-2xl bg-secondary sm:min-h-[calc(100vh-32px)] sm:rounded-3xl">
         {/* Calm "Quiet Desk" backdrop: warm gradient + faint grid + a single honey glow */}
         <div aria-hidden="true" className="absolute inset-0">
-          <div className="absolute inset-0 bg-gradient-to-b from-accent/40 via-background to-secondary" />
+          <div className="absolute inset-0 bg-gradient-to-b from-accent/30 via-background to-secondary" />
           <div
-            className="absolute inset-0 opacity-50"
+            className="absolute inset-0 opacity-35"
             style={{
               backgroundImage:
                 "radial-gradient(circle at 1px 1px, var(--color-border) 1px, transparent 0)",
@@ -36,10 +36,10 @@ export function Hero() {
             }}
           />
           <motion.div
-            className="absolute -top-24 left-1/2 h-[55%] w-[70%] -translate-x-1/2 rounded-full opacity-50 blur-3xl"
-            style={{ background: "oklch(0.85 0.12 92 / 0.55)" }}
+            className="absolute -top-24 left-1/2 h-[55%] w-[70%] -translate-x-1/2 rounded-full opacity-45 blur-3xl"
+            style={{ background: "oklch(0.85 0.12 92 / 0.5)" }}
             initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 0.5, scale: 1 }}
+            animate={{ opacity: 0.45, scale: 1 }}
             transition={{ duration: 1.4, ease: EASE }}
           />
         </div>
@@ -52,7 +52,7 @@ export function Hero() {
           <div className="flex flex-col items-center px-4 pt-10 pb-8 text-center sm:pt-16 sm:pb-12">
             <motion.span
               {...rise(0.15)}
-              className="inline-flex items-center gap-2 rounded-full bg-background px-4 py-1.5 text-[13px] shadow-sm"
+              className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/90 px-4 py-1.5 text-[13px] shadow-[0_12px_30px_-24px_rgba(0,0,0,0.35)] backdrop-blur-sm"
             >
               <span
                 className="h-2 w-2 rounded-full bg-primary"
@@ -89,17 +89,23 @@ export function Hero() {
             <motion.div {...rise(0.51)}>
               <Link
                 href="/sign-up"
-                className="mt-6 inline-flex items-center gap-3 rounded-full bg-foreground py-2 pr-2 pl-6 text-[14px] font-medium text-background transition-transform hover:-translate-y-0.5 sm:mt-8 sm:py-2.5 sm:pl-7"
+                className="sheen-host group mt-6 inline-flex items-center gap-3 rounded-full bg-foreground py-2 pr-2 pl-6 text-[14px] font-medium text-background transition-[transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:shadow-[0_16px_40px_-24px_rgba(0,0,0,0.45)] sm:mt-8 sm:py-2.5 sm:pl-7"
               >
                 Get started free
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/15 sm:h-7 sm:w-7">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/15 transition-transform duration-300 group-hover:translate-x-0.5 sm:h-7 sm:w-7">
                   <ChevronRight className="h-4 w-4" strokeWidth={2} />
                 </span>
               </Link>
             </motion.div>
           </div>
 
-          <motion.div {...rise(0.6)}>
+          <motion.div
+            {...rise(0.6)}
+            className="origin-bottom"
+            initial={{ opacity: 0, y: 24, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.75, ease: EASE, delay: 0.6 }}
+          >
             <HeroDashboard />
           </motion.div>
         </div>

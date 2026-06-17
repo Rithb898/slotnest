@@ -3,7 +3,6 @@
 import {
   CalendarDays,
   ChevronsUpDown,
-  FileText,
   Inbox,
   LogOut,
   MessageSquare,
@@ -20,8 +19,8 @@ import { useEffect, useState } from "react";
 
 import { BillingUpgradeButton } from "@/components/billing-upgrade-button";
 import { useCommandBar } from "@/components/command-bar";
+import { SlotNestMark } from "@/components/slotnest-logo";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -70,7 +69,6 @@ const PRIMARY: NavItem[] = [
   { href: "/chat", label: "Chat", icon: MessageSquare, shortcut: "G A" },
   { href: "/inbox", label: "Inbox", icon: Inbox, shortcut: "G I" },
   { href: "/calendar", label: "Calendar", icon: CalendarDays, shortcut: "G C" },
-  { href: "/drafts", label: "Drafts", icon: FileText, shortcut: "G D" },
   { href: "/waiting", label: "Waiting", icon: Send, shortcut: "G W" },
 ];
 
@@ -136,8 +134,9 @@ export function AppSidebar() {
   });
 
   const needsYou =
-    inbox.data?.messages.filter((m) => m.triage.action === "Needs reply")
-      .length ?? 0;
+    inbox.data?.messages.filter(
+      (m) => m.triage.action === "Needs reply" && m.replyStatus !== "sent",
+    ).length ?? 0;
   const waitingCount =
     inbox.data?.messages.filter((m) => {
       const text = `${m.subject} ${m.snippet}`.toLowerCase();
@@ -174,7 +173,6 @@ export function AppSidebar() {
     if (href === "/calendar" && todayCount > 0) {
       return <CountBadge count={todayCount} tone="muted" />;
     }
-    if (href === "/drafts") return <CountBadge count={needsYou} />;
     if (href === "/waiting")
       return <CountBadge count={waitingCount} tone="muted" />;
     if (href === "/settings" && health) return <StatusDot health={health} />;
@@ -198,7 +196,7 @@ export function AppSidebar() {
           >
             <Avatar className="size-7 rounded-xl">
               <AvatarFallback className="rounded-xl bg-primary text-primary-foreground">
-                <Sun className="size-4" />
+                <SlotNestMark className="size-4 text-primary-foreground" />
               </AvatarFallback>
             </Avatar>
             <span className="min-w-0 truncate">SlotNest</span>
@@ -317,9 +315,6 @@ export function AppSidebar() {
                   </div>
                 ) : null}
               </div>
-              <Badge variant={plan?.name === "pro" ? "default" : "outline"}>
-                {plan?.priceInr ? `₹${plan.priceInr}` : "₹0"}
-              </Badge>
             </div>
             {state !== "collapsed" && plan?.name !== "pro" ? (
               <BillingUpgradeButton

@@ -35,7 +35,7 @@ const formSchema = z.object({
 
 const signInWithGoogle = async () => {
   await authClient.signIn.social(
-    { provider: "google", callbackURL: "/" },
+    { provider: "google", callbackURL: "/today" },
     {
       onError: (ctx) => {
         toast.error(ctx.error.message);
@@ -63,12 +63,12 @@ export function SignInForm({
         {
           email: value.email,
           password: value.password,
-          callbackURL: "/",
+          callbackURL: "/today",
         },
         {
           onSuccess: () => {
             toast.success("Signed in");
-            router.push("/");
+            router.push("/today");
           },
           onError: (ctx) => {
             toast.error(ctx.error.message);

@@ -7,6 +7,83 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { api } from "@/trpc/react";
 
+const RAZORPAY_CHECKOUT_SCRIPT = "https://checkout.razorpay.com/v1/checkout.js";
+
+type RazorpayCheckoutResponse = {
+  razorpay_payment_id: string;
+  razorpay_subscription_id: string;
+  razorpay_signature: string;
+};
+
+type RazorpayCheckoutOptions = {
+  key: string;
+  subscription_id: string;
+  name: string;
+  description: string;
+  prefill?: {
+    name?: string;
+    email?: string;
+  };
+  theme?: {
+    color?: string;
+  };
+  modal?: {
+    ondismiss?: () => void;
+  };
+  handler: (response: RazorpayCheckoutResponse) => void;
+};
+
+type RazorpayConstructor = new (
+  options: RazorpayCheckoutOptions,
+) => {
+  open: () => void;
+};
+
+declare global {
+  interface Window {
+    Razorpay?: RazorpayConstructor;
+  }
+}
+
+let razorpayScriptLoad: Promise<void> | undefined;
+
+function loadRazorpayCheckout() {
+  if (typeof window === "undefined") {
+    return Promise.reject(new Error("Razorpay checkout requires a browser."));
+  }
+
+  if (window.Razorpay) return Promise.resolve();
+
+  razorpayScriptLoad ??= new Promise<void>((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>(
+      `script[src="${RAZORPAY_CHECKOUT_SCRIPT}"]`,
+    );
+
+    if (existing) {
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener(
+        "error",
+        () => reject(new Error("Could not load Razorpay checkout.")),
+        { once: true },
+      );
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = RAZORPAY_CHECKOUT_SCRIPT;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () =>
+      reject(new Error("Could not load Razorpay checkout."));
+    document.body.appendChild(script);
+  }).catch((error) => {
+    razorpayScriptLoad = undefined;
+    throw error;
+  });
+
+  return razorpayScriptLoad;
+}
+
 export function BillingUpgradeButton({
   label = "Upgrade now",
   children,
@@ -21,38 +98,54 @@ export function BillingUpgradeButton({
 >) {
   const router = useRouter();
   const utils = api.useUtils();
-  const createLink = api.billing.createSubscriptionLink.useMutation({
-    onError: () => toast.error("Could not start billing right now."),
-  });
+  const createCheckout = api.billing.createCheckoutSubscription.useMutation();
+  const verifyCheckout = api.billing.verifySubscriptionCheckout.useMutation();
 
   async function handleUpgrade() {
-    const popup = window.open("", "_blank", "noopener,noreferrer");
-
     try {
-      const result = await createLink.mutateAsync();
+      const result = await createCheckout.mutateAsync();
+      await loadRazorpayCheckout();
 
-      if (!result.shortUrl) {
-        throw new Error("Missing Razorpay link");
+      if (!window.Razorpay) {
+        throw new Error("Razorpay checkout did not initialize.");
       }
 
-      if (popup) {
-        popup.location.href = result.shortUrl;
-        const poll = window.setInterval(() => {
-          if (popup.closed) {
-            window.clearInterval(poll);
-            void utils.billing.summary.invalidate();
-            router.refresh();
-          }
-        }, 500);
-      } else {
-        window.location.href = result.shortUrl;
-      }
+      const checkout = new window.Razorpay({
+        key: result.keyId,
+        subscription_id: result.subscriptionId,
+        name: "SlotNest",
+        description: `${result.planLabel} subscription`,
+        prefill: {
+          name: result.user.name,
+          email: result.user.email,
+        },
+        theme: {
+          color: "#18181b",
+        },
+        modal: {
+          ondismiss: () => toast("Checkout closed."),
+        },
+        handler: (response) => {
+          void verifyCheckout
+            .mutateAsync(response)
+            .then(async () => {
+              toast.success("Subscription verified.");
+              await utils.billing.summary.invalidate();
+              router.refresh();
+            })
+            .catch(() => {
+              toast.error("Could not verify the Razorpay payment.");
+            });
+        },
+      });
+
+      checkout.open();
     } catch {
-      popup?.close();
+      toast.error("Could not open Razorpay checkout.");
     }
   }
 
-  const disabled = createLink.isPending;
+  const disabled = createCheckout.isPending || verifyCheckout.isPending;
 
   return (
     <Button

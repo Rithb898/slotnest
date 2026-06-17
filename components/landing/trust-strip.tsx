@@ -15,7 +15,7 @@ export function TrustStrip() {
   return (
     <section
       aria-label="What SlotNest does"
-      className="border-y border-border bg-secondary/60 py-4"
+      className="border-y border-border bg-secondary/55 py-4"
     >
       <div className="relative overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_8%,black_92%,transparent)]">
         <ul className="marquee-track gap-8" aria-hidden>

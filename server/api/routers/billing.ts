@@ -1,5 +1,8 @@
-import { eq } from "drizzle-orm";
+import { createHmac, timingSafeEqual } from "node:crypto";
+import { TRPCError } from "@trpc/server";
+import { and, eq } from "drizzle-orm";
 import Razorpay from "razorpay";
+import { z } from "zod";
 import { BILLING_PLAN_CATALOG } from "@/lib/billing-plans";
 import { env } from "@/lib/config/env";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
@@ -24,7 +27,7 @@ type RazorpaySubscriptionRecord = {
   total_count: number;
   paid_count: number;
   remaining_count?: string | number | null;
-  short_url: string;
+  short_url?: string | null;
 };
 
 const STATUS_PRIORITY = [
@@ -93,7 +96,6 @@ function mapSubscription(remote: RazorpaySubscription) {
     totalCount: remote.total_count,
     paidCount: remote.paid_count,
     remainingCount: toNumber(remote.remaining_count),
-    shortUrl: remote.short_url,
   };
 }
 
@@ -111,10 +113,55 @@ function subscriptionMatches(
     current.quantity === next.quantity &&
     current.totalCount === next.totalCount &&
     current.paidCount === next.paidCount &&
-    current.remainingCount === next.remainingCount &&
-    current.shortUrl === next.shortUrl
+    current.remainingCount === next.remainingCount
   );
 }
+
+function toCheckoutPayload(
+  remoteSubscriptionId: string,
+  user: { name?: string | null; email?: string | null },
+) {
+  const plan = BILLING_PLANS.pro;
+
+  return {
+    keyId: env.RAZORPAY_KEY_ID,
+    subscriptionId: remoteSubscriptionId,
+    planName: plan.name,
+    planLabel: plan.label,
+    amountInr: plan.priceInr,
+    user: {
+      name: user.name ?? "",
+      email: user.email ?? "",
+    },
+  };
+}
+
+function isValidCheckoutSignature(input: {
+  razorpay_payment_id: string;
+  razorpay_subscription_id: string;
+  razorpay_signature: string;
+}) {
+  const expected = createHmac("sha256", env.RAZORPAY_KEY_SECRET)
+    .update(
+      `${input.razorpay_payment_id}|${input.razorpay_subscription_id}`,
+      "utf8",
+    )
+    .digest("hex");
+
+  const received = Buffer.from(input.razorpay_signature, "hex");
+  const expectedBuffer = Buffer.from(expected, "hex");
+
+  return (
+    received.length === expectedBuffer.length &&
+    timingSafeEqual(received, expectedBuffer)
+  );
+}
+
+const verifySubscriptionCheckoutInput = z.object({
+  razorpay_payment_id: z.string().min(1),
+  razorpay_subscription_id: z.string().min(1),
+  razorpay_signature: z.string().min(1),
+});
 
 async function syncSubscription(
   ctx: { db: typeof import("@/server/db").db },
@@ -143,18 +190,18 @@ async function syncSubscription(
 }
 
 export const billingRouter = createTRPCRouter({
-  createSubscriptionLink: protectedProcedure.mutation(async ({ ctx }) => {
+  createCheckoutSubscription: protectedProcedure.mutation(async ({ ctx }) => {
     const existingRows = await ctx.db
       .select()
       .from(subscription)
       .where(eq(subscription.referenceId, ctx.session.user.id));
     const current = selectSubscription(existingRows);
 
-    if (current?.shortUrl && canReuseCheckout(current.status)) {
-      return {
-        subscriptionId: current.razorpaySubscriptionId ?? current.id,
-        shortUrl: current.shortUrl,
-      };
+    if (current?.razorpaySubscriptionId && canReuseCheckout(current.status)) {
+      return toCheckoutPayload(
+        current.razorpaySubscriptionId,
+        ctx.session.user,
+      );
     }
 
     const localId = crypto.randomUUID();
@@ -189,14 +236,62 @@ export const billingRouter = createTRPCRouter({
         .where(eq(subscription.id, localId));
 
       return {
-        subscriptionId: remote.id,
-        shortUrl: remote.short_url,
+        ...toCheckoutPayload(remote.id, ctx.session.user),
       };
     } catch (error) {
       await ctx.db.delete(subscription).where(eq(subscription.id, localId));
       throw error;
     }
   }),
+
+  verifySubscriptionCheckout: protectedProcedure
+    .input(verifySubscriptionCheckoutInput)
+    .mutation(async ({ ctx, input }) => {
+      if (!isValidCheckoutSignature(input)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Invalid Razorpay checkout signature.",
+        });
+      }
+
+      const [current] = await ctx.db
+        .select()
+        .from(subscription)
+        .where(
+          and(
+            eq(subscription.referenceId, ctx.session.user.id),
+            eq(
+              subscription.razorpaySubscriptionId,
+              input.razorpay_subscription_id,
+            ),
+          ),
+        );
+
+      if (!current) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Subscription was not found for this account.",
+        });
+      }
+
+      const remote = (await razorpayClient.subscriptions.fetch(
+        input.razorpay_subscription_id,
+      )) as RazorpaySubscription;
+      const next = mapSubscription(remote);
+
+      await ctx.db
+        .update(subscription)
+        .set(next)
+        .where(eq(subscription.id, current.id));
+
+      return {
+        ok: true,
+        subscription: {
+          ...current,
+          ...next,
+        },
+      };
+    }),
 
   summary: protectedProcedure.query(async ({ ctx }) => {
     const rows = await ctx.db

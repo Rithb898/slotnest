@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
-import { Agent, run } from "@openai/agents";
+import { OpenAIAgentsProvider } from "@corsair-dev/mcp";
+import { Agent, run, tool } from "@openai/agents";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
@@ -11,26 +12,22 @@ import {
 } from "@/lib/prompts";
 import { searchSentExemplars } from "@/lib/sent-embeddings";
 import {
-  buildAgentTools,
-  type EmailRef,
-  type ToolCollector,
-} from "@/server/api/agent/tools";
-import {
   type AgentProposal,
   proposalOutputUnion,
   toAgentProposal,
 } from "@/server/api/routers/agent";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
+import { corsairReadonly } from "@/server/corsair";
 import { db } from "@/server/db";
 import { chatConversation, chatMessage } from "@/server/db/schema";
 
 /**
  * Chat — the persistent conversational agent (plan 011, ADR 0001).
  *
- * The agent holds only read tools (`server/api/agent/tools.ts`) on a `readonly`
- * Corsair instance — it physically cannot send or book. Outbound actions are
- * emitted as structured proposals, persisted as `approval` messages, and only
- * executed later through the deterministic mutations on a human keypress.
+ * The agent uses Corsair MCP tools on a tenant-scoped `readonly` Corsair
+ * instance — it physically cannot send or book. Outbound actions are emitted as
+ * structured proposals, persisted as `approval` messages, and only executed
+ * later through the deterministic mutations on a human keypress.
  *
  * Conversation + messages are persisted (tenant-scoped) so references like "the
  * second one" resolve by stored Gmail ID across turns, and history survives a
@@ -42,6 +39,17 @@ const VOICE_MODEL = "gpt-4.1"; // bigger: reply drafting in user voice (swappabl
 
 // Stored/rendered proposal shape (the clean discriminated union from agent.ts).
 type Proposal = AgentProposal;
+
+type EmailRef = {
+  id: string;
+  threadId: string | null;
+  fromName: string;
+  fromEmail: string;
+  to: string;
+  subject: string;
+  snippet: string;
+  date: string | null;
+};
 
 // Agent OUTPUT shape uses the `anyOf` proposal union (`z.union`) from agent.ts —
 // OpenAI structured outputs support `anyOf` but reject `oneOf`. Each emitted
@@ -271,12 +279,20 @@ export const chatRouter = createTRPCRouter({
         };
       }
 
-      const collector: ToolCollector = { lastEmailList: null };
+      const tenant = corsairReadonly.withTenant(userId);
+      const provider = new OpenAIAgentsProvider();
+      const tools = await provider.build({
+        corsair: tenant as unknown as Record<string, unknown>,
+        tool,
+        tenantId: userId,
+        setup: false,
+      });
+
       const agent = new Agent({
         name: "slotnest-chat",
         model: CHAT_MODEL,
         instructions: CHAT_AGENT_INSTRUCTIONS,
-        tools: buildAgentTools(userId, collector),
+        tools,
         outputType: chatOutputSchema,
       });
 
@@ -298,16 +314,6 @@ export const chatRouter = createTRPCRouter({
             role: "assistant",
             type: "text",
             content: { text: output.text.trim() },
-          }),
-        );
-      }
-
-      if (collector.lastEmailList && collector.lastEmailList.length > 0) {
-        newMessages.push(
-          await insertMessage(conversationId, {
-            role: "assistant",
-            type: "email_list",
-            content: { intro: null, emails: collector.lastEmailList },
           }),
         );
       }

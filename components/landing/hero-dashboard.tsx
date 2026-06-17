@@ -88,7 +88,7 @@ function TargetInput({
 
 function TriagedCard() {
   return (
-    <div className="flex flex-col rounded-2xl bg-background p-5">
+    <div className="flex flex-col rounded-2xl bg-background p-5 transition-transform duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-28px_rgba(0,0,0,0.35)]">
       <CardHeader title="Triaged" period="This week" />
       <div className="mt-3 flex items-center gap-2">
         <span className="text-[28px] font-semibold leading-none">248</span>
@@ -115,7 +115,7 @@ function TriagedCard() {
 
 function TriageSettingsCard() {
   return (
-    <div className="flex flex-col gap-3 rounded-2xl bg-background p-5">
+    <div className="flex flex-col gap-3 rounded-2xl bg-background p-5 transition-transform duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-28px_rgba(0,0,0,0.35)]">
       <Dropdown label="Show inbox for" value="This week" />
       <Dropdown label="Group by" value="Action needed" />
       <TargetInput label="Daily target (emails)" defaultValue="20" />
@@ -147,7 +147,7 @@ function TriageSettingsCard() {
 
 function FreeSlotsCard() {
   return (
-    <div className="flex flex-col rounded-2xl bg-background p-5">
+    <div className="flex flex-col rounded-2xl bg-background p-5 transition-transform duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-28px_rgba(0,0,0,0.35)]">
       <CardHeader title="Free slots" period="today" />
       <div className="mt-3 flex items-center gap-2">
         <span className="text-[28px] font-semibold leading-none">4</span>
@@ -170,7 +170,7 @@ function FreeSlotsCard() {
 export function HeroDashboard() {
   return (
     <div className="px-3 sm:px-4">
-      <div className="mx-auto w-full max-w-[880px] rounded-3xl bg-muted p-4 sm:p-6">
+      <div className="mx-auto w-full max-w-[880px] rounded-3xl bg-muted p-4 shadow-[0_24px_70px_-40px_rgba(0,0,0,0.35)] sm:p-6">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
           <TriagedCard />
           <TriageSettingsCard />

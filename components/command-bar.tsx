@@ -3,7 +3,6 @@
 import {
   CalendarDays,
   CalendarPlus,
-  FileText,
   Inbox,
   Loader2,
   Mail,
@@ -67,7 +66,6 @@ const GOTO: Record<string, Route> = {
   a: "/chat",
   i: "/inbox",
   c: "/calendar",
-  d: "/drafts",
   w: "/waiting",
 };
 
@@ -433,11 +431,6 @@ export function CommandBar({ children }: { children?: React.ReactNode }) {
               <CalendarDays />
               <span>Calendar</span>
               <CommandShortcut>g c</CommandShortcut>
-            </CommandItem>
-            <CommandItem onSelect={() => go("/drafts")}>
-              <FileText />
-              <span>Drafts</span>
-              <CommandShortcut>g d</CommandShortcut>
             </CommandItem>
             <CommandItem onSelect={() => go("/waiting")}>
               <Send />

@@ -1,4 +1,5 @@
 import { AtSign, Globe, Mail } from "lucide-react";
+import { SlotNestLogo } from "@/components/slotnest-logo";
 
 const NAV = [
   { label: "Features", href: "#features" },
@@ -18,25 +19,12 @@ export function SiteFooter() {
     <footer className="relative overflow-hidden border-t border-border bg-muted text-foreground">
       {/* Top nav row */}
       <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-5 px-5 py-7 sm:flex-row sm:px-8">
-        <a
-          href="/"
-          className="flex items-center gap-2.5 font-bold tracking-tight"
-        >
-          <svg
-            className="size-6 shrink-0 text-primary"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-          >
-            <title>SlotNest Logo</title>
-            <path
-              d="M12 3v18M3 12h18M5.636 5.636l12.728 12.728M5.636 19.364L18.364 5.636"
-              strokeLinecap="round"
-            />
-            <circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none" />
-          </svg>
-          <span className="text-[1.05rem]">SlotNest</span>
+        <a href="/" className="flex items-center">
+          <SlotNestLogo
+            className="gap-2.5"
+            markClassName="size-6"
+            wordmarkClassName="text-[1.05rem] font-bold"
+          />
         </a>
 
         <nav className="flex items-center gap-6">
@@ -44,7 +32,7 @@ export function SiteFooter() {
             <a
               key={l.label}
               href={l.href}
-              className="font-medium text-[0.85rem] text-muted-foreground transition-colors hover:text-foreground"
+              className="font-medium text-[0.85rem] text-muted-foreground transition-[color,transform] duration-200 hover:-translate-y-0.5 hover:text-foreground"
             >
               {l.label}
             </a>
@@ -57,7 +45,7 @@ export function SiteFooter() {
               key={s.label}
               href={s.href}
               aria-label={s.label}
-              className="grid size-9 place-items-center rounded-full border border-border text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
+              className="grid size-9 place-items-center rounded-full border border-border text-muted-foreground transition-[transform,border-color,color] duration-200 hover:-translate-y-0.5 hover:border-foreground/40 hover:text-foreground"
             >
               <s.icon className="size-4" />
             </a>

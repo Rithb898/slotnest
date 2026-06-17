@@ -693,6 +693,28 @@ export const gmailRouter = createTRPCRouter({
         ctx.session.user.id,
         source.messages.map((m) => m.id),
       );
+      const draftRows =
+        source.messages.length > 0
+          ? await db
+              .select({
+                messageId: replyDraft.messageId,
+                status: replyDraft.status,
+                body: replyDraft.body,
+              })
+              .from(replyDraft)
+              .where(
+                and(
+                  eq(replyDraft.userId, ctx.session.user.id),
+                  inArray(
+                    replyDraft.messageId,
+                    source.messages.map((m) => m.id),
+                  ),
+                ),
+              )
+          : [];
+      const draftsByMessageId = new Map(
+        draftRows.map((row) => [row.messageId, row]),
+      );
 
       const messages = await Promise.all(
         source.messages.map(async (message) => {
@@ -716,6 +738,8 @@ export const gmailRouter = createTRPCRouter({
             snippet: message.snippet,
             date: message.date,
             unread: message.unread,
+            replyStatus: draftsByMessageId.get(message.id)?.status ?? null,
+            replyBody: draftsByMessageId.get(message.id)?.body ?? null,
             triage: labels,
           };
         }),

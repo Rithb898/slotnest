@@ -27,10 +27,10 @@ export function Reveal({
 }: RevealProps) {
   const motionProps = {
     className,
-    initial: { opacity: 0, y: 24 },
+    initial: { opacity: 0, y: 16, scale: 0.99, filter: "blur(6px)" },
     whileInView: { opacity: 1, y: 0 },
     viewport: { once: true, amount: 0.2, margin: "0px 0px -8% 0px" },
-    transition: { duration: 0.6, delay: delay / 1000, ease: EASE },
+    transition: { duration: 0.72, delay: delay / 1000, ease: EASE },
   } as const;
 
   if (as === "li") {

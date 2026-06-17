@@ -43,7 +43,7 @@ export function HowItWorks() {
       <ol className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {STEPS.map((s, i) => (
           <Reveal as="li" key={s.title} delay={i * 80}>
-            <div className="flex h-full flex-col rounded-2xl border border-border bg-card p-5">
+            <div className="flex h-full flex-col rounded-2xl border border-border bg-card p-5 transition-transform duration-300 hover:-translate-y-1 hover:shadow-[0_20px_50px_-28px_rgba(0,0,0,0.35)]">
               <div className="flex items-center justify-between">
                 <span className="grid size-10 place-items-center rounded-xl bg-primary/15 text-honey-ink">
                   <s.icon className="size-5" />

@@ -193,7 +193,7 @@ function Card({
   return (
     <div
       style={style}
-      className={`rounded-2xl border border-border/70 bg-white p-5 shadow-[0_8px_30px_-20px_rgba(0,0,0,0.25)] ${className}`}
+      className={`group rounded-2xl border border-border/70 bg-white p-5 shadow-[0_8px_30px_-20px_rgba(0,0,0,0.25)] transition-[transform,box-shadow] duration-300 hover:-translate-y-1 hover:shadow-[0_20px_40px_-24px_rgba(0,0,0,0.28)] ${className}`}
     >
       {children}
     </div>
