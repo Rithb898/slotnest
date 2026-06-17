@@ -367,7 +367,7 @@
     .caret,
     .marquee-track,
     .sheen-host:hover::after {
-      animation: none !important;
+      animation: none;
     }
     [data-reveal="armed"] {
       opacity: 1;

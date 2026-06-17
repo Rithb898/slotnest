@@ -1,6 +1,6 @@
-import { corsair } from "@/server/corsair";
-import { NextResponse, type NextRequest } from "next/server";
 import { processWebhook } from "corsair";
+import { type NextRequest, NextResponse } from "next/server";
+import { corsair } from "@/server/corsair";
 
 export async function POST(request: NextRequest) {
   const url = new URL(request.url);
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     body = await request.json();
   } else {
     const text = await request.text();
-    body = text && text.trim() ? text : {};
+    body = text?.trim() ? text : {};
   }
 
   const tenantId =

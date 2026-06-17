@@ -1,5 +1,10 @@
 "use client";
-import { cn } from "@/lib/utils";
+import { useForm } from "@tanstack/react-form";
+import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import z from "zod";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,12 +22,7 @@ import {
   FieldSeparator,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import Image from "next/image";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import z from "zod";
-import { useForm } from "@tanstack/react-form";
-import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { authClient } from "@/server/auth/client";
 
 const formSchema = z.object({
@@ -32,6 +32,17 @@ const formSchema = z.object({
     .min(8)
     .describe("Password must be at least 8 characters long"),
 });
+
+const signInWithGoogle = async () => {
+  await authClient.signIn.social(
+    { provider: "google", callbackURL: "/" },
+    {
+      onError: (ctx) => {
+        toast.error(ctx.error.message);
+      },
+    },
+  );
+};
 
 export function SignInForm({
   className,
@@ -67,17 +78,6 @@ export function SignInForm({
     },
   });
 
-  const signInWithGoogle = async () => {
-    await authClient.signIn.social(
-      { provider: "google", callbackURL: "/" },
-      {
-        onError: (ctx) => {
-          toast.error(ctx.error.message);
-        },
-      },
-    );
-  };
-
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
@@ -91,7 +91,6 @@ export function SignInForm({
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              e.stopPropagation();
               void form.handleSubmit();
             }}
           >

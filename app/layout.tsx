@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Instrument_Sans, JetBrains_Mono, Spectral } from "next/font/google";
 import "./globals.css";
 import { LenisProvider } from "@/components/lenis-provider";
-import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -50,19 +49,12 @@ export default function RootLayout({
       )}
     >
       <body className="min-h-full flex flex-col">
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <LenisProvider>
-            <TRPCReactProvider>
-              <TooltipProvider>{children}</TooltipProvider>
-              <Toaster />
-            </TRPCReactProvider>
-          </LenisProvider>
-        </ThemeProvider>
+        <LenisProvider>
+          <TRPCReactProvider>
+            <TooltipProvider>{children}</TooltipProvider>
+            <Toaster />
+          </TRPCReactProvider>
+        </LenisProvider>
       </body>
     </html>
   );

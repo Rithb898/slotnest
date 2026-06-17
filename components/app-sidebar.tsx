@@ -7,19 +7,15 @@ import {
   Inbox,
   LogOut,
   MessageSquare,
-  Monitor,
-  Moon,
   Plug,
   Search,
   Send,
   Settings,
   Sun,
-  SunMedium,
 } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 
 import { useCommandBar } from "@/components/command-bar";
@@ -278,7 +274,6 @@ export function AppSidebar() {
         </nav>
 
         <div className="flex flex-col gap-2 border-t border-border p-2">
-          <ThemeToggle />
           <AccountMenu />
         </div>
       </aside>
@@ -460,53 +455,9 @@ function StatusDot({ health }: { health: ConnHealth }) {
   );
 }
 
-const THEMES = [
-  { value: "light", label: "Light", icon: SunMedium },
-  { value: "system", label: "System", icon: Monitor },
-  { value: "dark", label: "Dark", icon: Moon },
-] as const;
-
-/**
- * (5) Visible theme toggle — a 3-way segmented control (Light / System / Dark).
- * `mounted` guards against an SSR/client mismatch so the active pill only
- * paints once the real theme is known.
- */
-function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-
-  return (
-    <div className="flex items-center gap-1 rounded-lg bg-muted/60 p-1">
-      {THEMES.map(({ value, label, icon: ThemeIcon }) => {
-        const active = mounted && theme === value;
-        return (
-          <button
-            key={value}
-            type="button"
-            aria-pressed={active}
-            aria-label={label}
-            title={label}
-            onClick={() => setTheme(value)}
-            className={cn(
-              "flex h-7 flex-1 items-center justify-center rounded-md transition-colors",
-              active
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <ThemeIcon className="size-4" />
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 /**
  * Account menu. `variant="rail"` is the full-width desktop footer row;
- * `variant="bar"` is a compact icon tab for the mobile bottom bar. The mobile
- * dropdown also carries the theme toggle (the desktop footer shows it inline).
+ * `variant="bar"` is a compact icon tab for the mobile bottom bar.
  */
 function AccountMenu({
   variant = "rail",
@@ -625,13 +576,6 @@ function AccountMenu({
                 ) : null}
               </DropdownMenuItem>
             </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <div className="px-1.5 py-1">
-              <p className="px-1 pb-1.5 text-xs font-medium text-muted-foreground/80">
-                Theme
-              </p>
-              <ThemeToggle />
-            </div>
           </>
         ) : null}
         <DropdownMenuSeparator />

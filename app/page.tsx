@@ -6,7 +6,6 @@ import { Hero } from "@/components/landing/hero";
 import { HowItWorks } from "@/components/landing/how-it-works";
 import { Showcase } from "@/components/landing/showcase";
 import { SiteFooter } from "@/components/landing/site-footer";
-import { StatBand } from "@/components/landing/stat-band";
 import { TrustStrip } from "@/components/landing/trust-strip";
 import { TypeMoment } from "@/components/landing/type-moment";
 
