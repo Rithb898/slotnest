@@ -3,6 +3,7 @@ import { Suspense } from "react";
 
 import { AppSidebar } from "@/components/app-sidebar";
 import { CommandBar } from "@/components/command-bar";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { getSession } from "@/server/auth/server";
 
 /**
@@ -21,19 +22,24 @@ import { getSession } from "@/server/auth/server";
  */
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <CommandBar>
-      <div className="flex h-svh w-full overflow-hidden">
-        <AppSidebar />
-        {/* data-lenis-prevent: the app shell scrolls inside this <main>, not the
-         * window — without it the root Lenis instance swallows wheel events and
-         * the page can't scroll. */}
-        <main className="min-h-0 flex-1 overflow-y-auto" data-lenis-prevent>
-          <Suspense fallback={children}>
-            <AuthGate>{children}</AuthGate>
-          </Suspense>
-        </main>
-      </div>
-    </CommandBar>
+    <SidebarProvider defaultOpen>
+      <CommandBar>
+        <div className="flex h-svh w-full overflow-hidden">
+          <AppSidebar />
+          {/* data-lenis-prevent: the app shell scrolls inside this <main>, not the
+           * window — without it the root Lenis instance swallows wheel events and
+           * the page can't scroll. */}
+          <main
+            className="min-h-0 min-w-0 flex-1 overflow-y-auto"
+            data-lenis-prevent
+          >
+            <Suspense fallback={children}>
+              <AuthGate>{children}</AuthGate>
+            </Suspense>
+          </main>
+        </div>
+      </CommandBar>
+    </SidebarProvider>
   );
 }
 

@@ -5,18 +5,20 @@ import { api } from "@/trpc/server";
 import { SettingsClient } from "./_components/settings-client";
 
 // Auth is enforced two ways: the proxy (`proxy.ts`) redirects signed-out users
-// to /sign-in, and `connections.list` is a `protectedProcedure` (the real guard).
+// to /sign-in, and the settings queries (`connections.list`, `billing.summary`)
+// are `protectedProcedure`s (the real guard).
 //
 // Cache Components: the page shell is static; the request-dependent data fetch
-// (`api.connections.list()` reads headers/session) lives in an async child
-// inside <Suspense>, so the shell can stream immediately.
+// (`api.connections.list()` and `api.billing.summary()` read headers/session)
+// live in an async child inside <Suspense>, so the shell can stream immediately.
 export default function SettingsPage() {
   return (
-    <div className="mx-auto w-full max-w-3xl px-5 py-7 sm:px-6 lg:px-10 lg:py-10">
+    <div className="mx-auto w-full max-w-4xl px-5 py-7 sm:px-6 lg:px-10 lg:py-10">
       <header className="mb-7 flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
         <p className="text-sm text-muted-foreground">
-          Manage the accounts SlotNest works with and your profile.
+          Manage connections, billing, trust, and your profile from one quiet
+          place.
         </p>
       </header>
       <Suspense fallback={<SettingsFallback />}>
@@ -27,8 +29,11 @@ export default function SettingsPage() {
 }
 
 async function SettingsData() {
-  const connected = await api.connections.list();
-  return <SettingsClient connected={connected} />;
+  const [connected, billing] = await Promise.all([
+    api.connections.list(),
+    api.billing.summary(),
+  ]);
+  return <SettingsClient billing={billing} connected={connected} />;
 }
 
 function SettingsFallback() {

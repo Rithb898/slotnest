@@ -1,7 +1,13 @@
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
+import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
-import { corsairAccounts, corsairIntegrations } from "@/server/db/schema";
+import {
+  corsairAccounts,
+  corsairEntities,
+  corsairEvents,
+  corsairIntegrations,
+} from "@/server/db/schema";
 
 export const connectionsRouter = createTRPCRouter({
   /**
@@ -21,4 +27,41 @@ export const connectionsRouter = createTRPCRouter({
 
     return [...new Set(rows.map((r) => r.name))];
   }),
+
+  disconnect: protectedProcedure
+    .input(z.object({ provider: z.enum(["gmail", "googlecalendar"]) }))
+    .mutation(async ({ ctx, input }) => {
+      const rows = await ctx.db
+        .select({ id: corsairAccounts.id })
+        .from(corsairAccounts)
+        .innerJoin(
+          corsairIntegrations,
+          eq(corsairAccounts.integrationId, corsairIntegrations.id),
+        )
+        .where(
+          and(
+            eq(corsairAccounts.tenantId, ctx.session.user.id),
+            eq(corsairIntegrations.name, input.provider),
+          ),
+        );
+
+      const accountIds = rows.map((row) => row.id);
+      if (accountIds.length === 0) {
+        return { disconnected: false as const };
+      }
+
+      await ctx.db.transaction(async (tx) => {
+        await tx
+          .delete(corsairEvents)
+          .where(inArray(corsairEvents.accountId, accountIds));
+        await tx
+          .delete(corsairEntities)
+          .where(inArray(corsairEntities.accountId, accountIds));
+        await tx
+          .delete(corsairAccounts)
+          .where(inArray(corsairAccounts.id, accountIds));
+      });
+
+      return { disconnected: true as const, provider: input.provider };
+    }),
 });

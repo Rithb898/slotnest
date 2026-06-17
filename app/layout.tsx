@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { TRPCReactProvider } from "@/trpc/react";
+import { Agentation } from "agentation";
 
 const sans = Instrument_Sans({
   variable: "--font-sans",
@@ -55,6 +56,7 @@ export default function RootLayout({
             <Toaster />
           </TRPCReactProvider>
         </LenisProvider>
+        {process.env.NODE_ENV === "development" && <Agentation />}
       </body>
     </html>
   );

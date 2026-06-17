@@ -1,4 +1,5 @@
 import { agentRouter } from "@/server/api/routers/agent";
+import { billingRouter } from "@/server/api/routers/billing";
 import { calendarRouter } from "@/server/api/routers/calendar";
 import { chatRouter } from "@/server/api/routers/chat";
 import { connectionsRouter } from "@/server/api/routers/connections";
@@ -15,6 +16,7 @@ export const appRouter = createTRPCRouter({
   agent: agentRouter,
   calendar: calendarRouter,
   chat: chatRouter,
+  billing: billingRouter,
   connections: connectionsRouter,
   gmail: gmailRouter,
   workspace: workspaceRouter,

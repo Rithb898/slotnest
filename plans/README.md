@@ -20,6 +20,7 @@ honor its STOP conditions, and update your row when done.
 | 009  | Agent propose → approve → execute (hero "one sentence" flow) | P2 | M | 004 | DONE (code complete: `agent.ask` now returns Zod-validated structured invite/reply proposals via Agents SDK `outputType`; ⌘K renders approval cards; Approve opens the existing `InviteDialog` / `ReplyDialog`, so actual writes still go through `calendar.createEvent` / `gmail.sendReply` behind a human keypress. Gates: focused Biome clean on touched files; `pnpm exec tsc --noEmit` only fails on unrelated `convix-pr-agency-hero` missing Vite deps. `build`/`dev` not run per repo instruction.) |
 | 010  | AI-native daily workspace and retention loop | P0 | L | 003, 004, 005, 009 | TODO |
 | 011  | Chat — the conversational AI agent (`/chat`) | P0 | L | 004, 005, 008, 009 | TODO |
+| 012  | Settings, trust, and Razorpay billing | P1 | M | 001, 003, 010 | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 

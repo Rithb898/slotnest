@@ -3,9 +3,11 @@
 import {
   CalendarDays,
   Check,
+  CreditCard,
   LogOut,
   Mail,
   Plug,
+  Shield,
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
@@ -13,15 +15,27 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-
+import { BillingUpgradeButton } from "@/components/billing-upgrade-button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BILLING_PLAN_CATALOG } from "@/lib/billing-plans";
 import { cn } from "@/lib/utils";
 import { authClient } from "@/server/auth/client";
+import type { RouterOutputs } from "@/trpc/react";
+import { api } from "@/trpc/react";
 
-type SettingsTab = "connections" | "account";
+type SettingsTab = "connections" | "billing" | "trust" | "account";
+type BillingSummary = RouterOutputs["billing"]["summary"];
 
 const PROVIDERS = [
   {
@@ -38,17 +52,22 @@ const PROVIDERS = [
   },
 ] as const;
 
-/**
- * /settings — a quiet, tabbed settings surface (DESIGN: "Quiet Desk").
- *
- * Connections is the primary tab (formerly its own /connections page); Account
- * shows the signed-in profile and sign-out. Honey is reserved for the single
- * active "Connect" action, matching the One Light Rule used across the app.
- */
-export function SettingsClient({ connected }: { connected: string[] }) {
+export function SettingsClient({
+  connected,
+  billing,
+}: {
+  connected: string[];
+  billing: BillingSummary;
+}) {
   const searchParams = useSearchParams();
   const initialTab: SettingsTab =
-    searchParams.get("tab") === "account" ? "account" : "connections";
+    searchParams.get("tab") === "billing"
+      ? "billing"
+      : searchParams.get("tab") === "trust"
+        ? "trust"
+        : searchParams.get("tab") === "account"
+          ? "account"
+          : "connections";
   const [tab, setTab] = useState<SettingsTab>(initialTab);
   const handled = useRef(false);
 
@@ -71,10 +90,18 @@ export function SettingsClient({ connected }: { connected: string[] }) {
 
   return (
     <Tabs value={tab} onValueChange={(v) => setTab(v as SettingsTab)}>
-      <TabsList className="w-full max-w-xs">
+      <TabsList className="w-full flex-wrap justify-start gap-1 sm:w-auto">
         <TabsTrigger value="connections" className="flex-1">
           <Plug />
           Connections
+        </TabsTrigger>
+        <TabsTrigger value="billing" className="flex-1">
+          <CreditCard />
+          Billing
+        </TabsTrigger>
+        <TabsTrigger value="trust" className="flex-1">
+          <Shield />
+          Trust & Safety
         </TabsTrigger>
         <TabsTrigger value="account" className="flex-1">
           Account
@@ -83,6 +110,14 @@ export function SettingsClient({ connected }: { connected: string[] }) {
 
       <TabsContent value="connections" className="pt-5">
         <ConnectionsPanel connected={connected} />
+      </TabsContent>
+
+      <TabsContent value="billing" className="pt-5">
+        <BillingPanel billing={billing} />
+      </TabsContent>
+
+      <TabsContent value="trust" className="pt-5">
+        <TrustPanel />
       </TabsContent>
 
       <TabsContent value="account" className="pt-5">
@@ -97,59 +132,102 @@ function labelFor(key: string): string {
 }
 
 function ConnectionsPanel({ connected }: { connected: string[] }) {
+  const router = useRouter();
   const missing = PROVIDERS.filter((p) => !connected.includes(p.key));
   const allConnected = missing.length === 0;
+  const connectionState = allConnected
+    ? "connected"
+    : connected.length > 0
+      ? "partial"
+      : "missing";
+  const utils = api.useUtils();
+  const disconnect = api.connections.disconnect.useMutation({
+    onSuccess: async (_, variables) => {
+      toast.success(`Disconnected ${labelFor(variables.provider)}`);
+      await utils.connections.list.invalidate();
+      router.refresh();
+    },
+    onError: () => {
+      toast.error("Could not disconnect right now.");
+    },
+  });
+
+  async function handleDisconnect(provider: (typeof PROVIDERS)[number]["key"]) {
+    if (!window.confirm(`Disconnect ${labelFor(provider)} from SlotNest?`)) {
+      return;
+    }
+    disconnect.mutate({ provider });
+  }
 
   return (
-    <div className="flex flex-col gap-3">
-      {/* One-click chain: connect both missing providers in sequence. Only worth
-       * its own CTA when more than one is missing — otherwise the row handles it. */}
-      {missing.length > 1 ? (
-        <div className="flex items-center gap-4 rounded-3xl border border-primary/30 bg-primary/5 p-4">
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-honey-ink">
-            <Sparkles className="size-5" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="text-[0.9375rem] font-semibold">Connect Google</div>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Gmail and Calendar together — one click.
-            </p>
+    <Card>
+      <CardHeader>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle>Connections</CardTitle>
+            <CardDescription>
+              Gmail and Calendar stay separate, with connect, reconnect, and
+              disconnect controls.
+            </CardDescription>
           </div>
-          <Link
-            href={`/api/corsair/connect?plugin=${missing[0].key}&next=${missing[1].key}`}
-            className={cn(buttonVariants({ size: "sm" }), "shrink-0")}
-          >
-            Connect Google
-          </Link>
+          <Badge variant="ghost" className="shrink-0 uppercase tracking-wide">
+            {connectionState}
+          </Badge>
         </div>
-      ) : null}
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        {missing.length > 1 ? (
+          <div className="flex items-center gap-4 rounded-3xl border border-primary/30 bg-primary/5 p-4">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-honey-ink">
+              <Sparkles className="size-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="text-[0.9375rem] font-semibold">
+                Connect Google
+              </div>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Gmail and Calendar together, one click.
+              </p>
+            </div>
+            <Link
+              href={`/api/corsair/connect?plugin=${missing[0].key}&next=${missing[1].key}`}
+              className={cn(buttonVariants({ size: "sm" }), "shrink-0")}
+            >
+              Connect Google
+            </Link>
+          </div>
+        ) : null}
 
-      {PROVIDERS.map((provider) => (
-        <ProviderRow
-          key={provider.key}
-          provider={provider}
-          isConnected={connected.includes(provider.key)}
-        />
-      ))}
+        {PROVIDERS.map((provider) => (
+          <ProviderRow
+            key={provider.key}
+            provider={provider}
+            isConnected={connected.includes(provider.key)}
+            onDisconnect={handleDisconnect}
+          />
+        ))}
 
-      <p className="mt-1 flex items-start gap-2 px-1 text-xs text-muted-foreground">
-        <ShieldCheck className="mt-px size-3.5 shrink-0" />
-        <span>
-          {allConnected
-            ? "SlotNest is connected. Tokens are encrypted at rest and only used to act on your behalf."
-            : "SlotNest only reads what it needs to triage and schedule. Tokens are encrypted at rest — disconnect any time in Google."}
-        </span>
-      </p>
-    </div>
+        <p className="mt-1 flex items-start gap-2 px-1 text-xs text-muted-foreground">
+          <ShieldCheck className="mt-px size-3.5 shrink-0" />
+          <span>
+            {allConnected
+              ? "SlotNest is connected. Tokens are encrypted at rest and only used to act on your behalf."
+              : "SlotNest only reads what it needs to triage and schedule. Tokens are encrypted at rest, and you can disconnect any time."}
+          </span>
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 
 function ProviderRow({
   provider,
   isConnected,
+  onDisconnect,
 }: {
   provider: (typeof PROVIDERS)[number];
   isConnected: boolean;
+  onDisconnect: (provider: (typeof PROVIDERS)[number]["key"]) => void;
 }) {
   const Icon = provider.icon;
   return (
@@ -185,24 +263,105 @@ function ProviderRow({
         </p>
       </div>
 
-      {isConnected ? (
-        <Link
-          href={`/api/corsair/connect?plugin=${provider.key}`}
-          className={cn(
-            buttonVariants({ variant: "ghost", size: "sm" }),
-            "shrink-0 text-muted-foreground",
-          )}
-        >
-          Reconnect
-        </Link>
-      ) : (
-        <Link
-          href={`/api/corsair/connect?plugin=${provider.key}`}
-          className={cn(buttonVariants({ size: "sm" }), "shrink-0")}
-        >
-          Connect
-        </Link>
-      )}
+      <div className="flex shrink-0 items-center gap-2">
+        {isConnected ? (
+          <>
+            <Link
+              href={`/api/corsair/connect?plugin=${provider.key}`}
+              className={cn(
+                buttonVariants({ variant: "ghost", size: "sm" }),
+                "text-muted-foreground",
+              )}
+            >
+              Reconnect
+            </Link>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => onDisconnect(provider.key)}
+            >
+              Disconnect
+            </Button>
+          </>
+        ) : (
+          <Link
+            href={`/api/corsair/connect?plugin=${provider.key}`}
+            className={cn(buttonVariants({ size: "sm" }), "shrink-0")}
+          >
+            Connect
+          </Link>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function BillingPanel({ billing }: { billing: BillingSummary }) {
+  const subscription = billing.subscription;
+  const plan = billing.currentPlan;
+  const subscriptionLabel = subscription
+    ? formatSubscriptionStatus(subscription.status)
+    : "No subscription";
+  const showCheckout = !subscription || plan.name !== "pro";
+
+  return (
+    <div className="flex flex-col gap-4">
+      <Card>
+        <CardHeader>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <CardTitle>Billing</CardTitle>
+              <CardDescription>
+                Plan status and the hosted Razorpay subscription flow.
+              </CardDescription>
+            </div>
+            <Badge variant="ghost">{subscriptionLabel}</Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div className="grid gap-3 rounded-3xl border border-foreground/5 bg-muted/30 p-4 sm:grid-cols-2">
+            <div>
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                Current plan
+              </div>
+              <div className="mt-1 text-lg font-semibold">
+                {plan?.label ?? "No active plan"}
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {plan?.description ?? BILLING_PLAN_CATALOG.pro.description}
+              </p>
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                Renewal
+              </div>
+              <div className="mt-1 text-lg font-semibold">
+                {subscription?.currentEnd
+                  ? formatDate(subscription.currentEnd)
+                  : "No active renewal"}
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {subscription?.trialEnd
+                  ? `Trial ends ${formatDate(subscription.trialEnd)}`
+                  : subscription?.status === "created"
+                    ? "Opening Razorpay checkout in a popup."
+                    : subscription?.status === "paused"
+                      ? "Subscription is paused in Razorpay."
+                      : subscription?.status === "pending"
+                        ? "Razorpay is retrying payment."
+                        : subscription?.status === "halted"
+                          ? "Razorpay needs payment attention."
+                          : "Renewal updates in Razorpay."}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {showCheckout ? <BillingUpgradeButton label="Upgrade now" /> : null}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -255,6 +414,59 @@ function AccountPanel() {
   );
 }
 
+function TrustPanel() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Trust & Safety</CardTitle>
+        <CardDescription>
+          What SlotNest can see, what it can do, and how billing stays separate.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4 text-sm text-muted-foreground">
+        <TrustRow
+          title="Data access"
+          body="SlotNest reads only what it needs to triage, draft, and schedule."
+        />
+        <Separator />
+        <TrustRow
+          title="Approval policy"
+          body="Outbound email and calendar actions require a human approval step in v1."
+        />
+        <Separator />
+        <TrustRow
+          title="Token handling"
+          body="OAuth tokens are encrypted at rest and scoped to the connected account."
+        />
+        <Separator />
+        <TrustRow
+          title="Disconnect"
+          body="You can disconnect Gmail or Calendar at any time from this page."
+        />
+        <Separator />
+        <TrustRow
+          title="Billing boundary"
+          body="Billing uses Razorpay, but account identity and Gmail or Calendar access stay separate."
+        />
+      </CardContent>
+    </Card>
+  );
+}
+
+function TrustRow({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-honey-ink">
+        <ShieldCheck className="size-4" />
+      </span>
+      <div>
+        <div className="font-medium text-foreground">{title}</div>
+        <div className="mt-1 leading-6">{body}</div>
+      </div>
+    </div>
+  );
+}
+
 function initials(name: string): string {
   return (
     name
@@ -264,4 +476,17 @@ function initials(name: string): string {
       .join("")
       .toUpperCase() || "?"
   );
+}
+
+function formatDate(value: Date): string {
+  return new Intl.DateTimeFormat("en", {
+    dateStyle: "medium",
+  }).format(value);
+}
+
+function formatSubscriptionStatus(status: string): string {
+  return status
+    .split("_")
+    .map((part) => part[0]?.toUpperCase() + part.slice(1))
+    .join(" ");
 }

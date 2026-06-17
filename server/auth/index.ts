@@ -3,6 +3,8 @@ import { betterAuth } from "better-auth";
 import { haveIBeenPwned } from "better-auth/plugins";
 import { env } from "@/lib/config/env";
 import { db } from "../db";
+import * as authSchema from "../db/schema/auth";
+import * as billingSchema from "../db/schema/billing";
 import { sendEmail } from "../email";
 import { ResetPassword } from "../email/templates/reset-password";
 import { VerifyEmail } from "../email/templates/verify-email";
@@ -10,6 +12,10 @@ import { VerifyEmail } from "../email/templates/verify-email";
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "pg",
+    schema: {
+      ...authSchema,
+      ...billingSchema,
+    },
   }),
   emailAndPassword: {
     enabled: true,
