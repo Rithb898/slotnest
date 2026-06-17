@@ -18,11 +18,17 @@ function base64Url(value: string): string {
     .replace(/=+$/g, "");
 }
 
+function normalizeBody(value: string): string {
+  return value.replace(/\r\n|\r|\n/g, "\r\n");
+}
+
 export function buildRfc2822ReplyRaw(input: ReplyMessageInput): string {
   const headers = [
     ["To", input.to],
     ["Subject", input.subject],
+    ["MIME-Version", "1.0"],
     ["Content-Type", 'text/plain; charset="UTF-8"'],
+    ["Content-Transfer-Encoding", "8bit"],
   ];
 
   if (input.inReplyTo) {
@@ -36,7 +42,7 @@ export function buildRfc2822ReplyRaw(input: ReplyMessageInput): string {
   const message = [
     ...headers.map(([name, value]) => `${name}: ${sanitizeHeaderValue(value)}`),
     "",
-    input.body,
+    normalizeBody(input.body),
   ].join("\r\n");
 
   return base64Url(message);

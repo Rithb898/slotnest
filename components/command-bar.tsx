@@ -233,12 +233,11 @@ export function CommandBar({ children }: { children?: React.ReactNode }) {
       return;
     }
 
-    if (!proposal.threadId) return;
     setReplyDraft({
       to: proposal.to,
       subject: proposal.subject,
       body: proposal.body,
-      threadId: proposal.threadId,
+      threadId: proposal.threadId ?? null,
       messageId: proposal.messageId,
       inReplyTo: proposal.inReplyTo,
       references: proposal.references,
@@ -306,8 +305,6 @@ export function CommandBar({ children }: { children?: React.ReactNode }) {
             <div className="flex flex-col gap-2 border-t border-border px-3 py-3">
               {proposals.map((proposal, index) => {
                 const key = `${proposal.kind}-${index}`;
-                const canApprove =
-                  proposal.kind === "invite" || Boolean(proposal.threadId);
                 return (
                   <div
                     key={key}
@@ -345,9 +342,6 @@ export function CommandBar({ children }: { children?: React.ReactNode }) {
                             <p className="line-clamp-2 whitespace-pre-wrap">
                               {proposal.body}
                             </p>
-                            {!proposal.threadId ? (
-                              <p>Open a Gmail thread before sending.</p>
-                            ) : null}
                           </div>
                         )}
                       </div>
@@ -355,7 +349,6 @@ export function CommandBar({ children }: { children?: React.ReactNode }) {
                         type="button"
                         size="sm"
                         variant="secondary"
-                        disabled={!canApprove}
                         onClick={() => approveProposal(proposal)}
                       >
                         {proposal.kind === "invite" ? (

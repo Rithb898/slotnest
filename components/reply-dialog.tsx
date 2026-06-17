@@ -27,7 +27,7 @@ export type ReplyDraft = {
   to: string;
   subject: string;
   body: string;
-  threadId: string;
+  threadId?: string | null;
   messageId?: string;
   inReplyTo?: string | null;
   references?: string | null;
@@ -71,6 +71,20 @@ export function ReplyDialog({
     },
   });
 
+  const sendEmail = api.gmail.sendEmail.useMutation({
+    onSuccess: () => {
+      toast.success("Email sent", {
+        description: "Added to Gmail Sent.",
+      });
+      void utils.gmail.inbox.invalidate();
+      onSent?.();
+      onOpenChange(false);
+    },
+    onError: (err) => {
+      toast.error("Couldn't send email", { description: err.message });
+    },
+  });
+
   const draftReply = api.gmail.draftReply.useMutation({
     onSuccess: (result) => {
       if (!result.configured) {
@@ -94,11 +108,19 @@ export function ReplyDialog({
     },
   });
 
-  const valid = Boolean(draft?.threadId && to.trim() && body.trim());
+  const valid = Boolean(draft?.subject.trim() && to.trim() && body.trim());
   const canDraftWithAi = Boolean(draft?.messageId) && !aiUnavailable;
 
   function send() {
     if (!draft || !valid) return;
+    if (!draft.threadId) {
+      sendEmail.mutate({
+        to: to.trim(),
+        subject: draft.subject,
+        body: body.trim(),
+      });
+      return;
+    }
     sendReply.mutate({
       to: to.trim(),
       subject: draft.subject,
@@ -121,7 +143,7 @@ export function ReplyDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Send className="size-4 text-muted-foreground" />
-            Draft reply
+            {draft?.threadId ? "Draft reply" : "Draft email"}
           </DialogTitle>
           <DialogDescription>
             Review the reply. Nothing is sent until you approve.
@@ -158,7 +180,8 @@ export function ReplyDialog({
                     disabled={
                       !canDraftWithAi ||
                       draftReply.isPending ||
-                      sendReply.isPending
+                      sendReply.isPending ||
+                      sendEmail.isPending
                     }
                     className="h-8"
                   >
@@ -186,21 +209,28 @@ export function ReplyDialog({
           <Button
             variant="ghost"
             onClick={() => onOpenChange(false)}
-            disabled={sendReply.isPending || draftReply.isPending}
+            disabled={
+              sendReply.isPending || sendEmail.isPending || draftReply.isPending
+            }
           >
             Cancel
           </Button>
           <Button
             variant="secondary"
             onClick={send}
-            disabled={!valid || sendReply.isPending || draftReply.isPending}
+            disabled={
+              !valid ||
+              sendReply.isPending ||
+              sendEmail.isPending ||
+              draftReply.isPending
+            }
           >
-            {sendReply.isPending ? (
+            {sendReply.isPending || sendEmail.isPending ? (
               "Sending..."
             ) : (
               <>
                 <Send className="size-4" />
-                Send reply
+                {draft?.threadId ? "Send reply" : "Send email"}
               </>
             )}
           </Button>

@@ -27,11 +27,13 @@ assert.equal(
   [
     "To: sam@example.com",
     "Subject: Re: Project update",
+    "MIME-Version: 1.0",
     'Content-Type: text/plain; charset="UTF-8"',
+    "Content-Transfer-Encoding: 8bit",
     "In-Reply-To: <original@example.com>",
     "References: <first@example.com> <original@example.com>",
     "",
-    "Sounds good.\nI'll review today.",
+    "Sounds good.\r\nI'll review today.",
   ].join("\r\n"),
 );
 

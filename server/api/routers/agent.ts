@@ -2,6 +2,7 @@ import { OpenAIAgentsProvider } from "@corsair-dev/mcp";
 import { Agent, run, tool } from "@openai/agents";
 import { z } from "zod";
 import { env } from "@/lib/config/env";
+import { parseAddress } from "@/lib/gmail";
 import { AGENT_ASK_INSTRUCTIONS } from "@/lib/prompts";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { corsair } from "@/server/corsair";
@@ -109,9 +110,10 @@ export function toAgentProposal(out: ProposalOutput): AgentProposal | null {
     });
     return parsed.success ? parsed.data : null;
   }
+  const parsedTo = parseAddress(out.to).email;
   const parsed = replyProposalSchema.safeParse({
     kind: "reply",
-    to: out.to,
+    to: parsedTo || out.to,
     subject: out.subject,
     body: out.body,
     threadId: out.threadId ?? undefined,

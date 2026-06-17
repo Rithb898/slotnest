@@ -6,10 +6,12 @@ import { and, asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { env } from "@/lib/config/env";
+import { type GmailPayload, getHeader, parseAddress } from "@/lib/gmail";
 import {
   CHAT_AGENT_INSTRUCTIONS,
   VOICE_DRAFT_INSTRUCTIONS,
 } from "@/lib/prompts";
+import { toReplyReferences, toReplySubject } from "@/lib/reply";
 import { searchSentExemplars } from "@/lib/sent-embeddings";
 import {
   type AgentProposal,
@@ -51,6 +53,12 @@ type EmailRef = {
   date: string | null;
 };
 
+type GmailHeaderMessage = {
+  id?: string;
+  threadId?: string;
+  payload?: GmailPayload;
+};
+
 // Agent OUTPUT shape uses the `anyOf` proposal union (`z.union`) from agent.ts —
 // OpenAI structured outputs support `anyOf` but reject `oneOf`. Each emitted
 // proposal is validated back into a clean `Proposal` via `toAgentProposal`.
@@ -78,7 +86,7 @@ type ChatMessagePayload =
       id: string;
       role: string;
       type: "approval";
-      content: { proposal: Proposal };
+      content: { proposal: Proposal; status?: "sent"; sentAt?: string };
       createdAt: Date;
     };
 
@@ -153,6 +161,41 @@ Write the final reply body now.`;
   return cleanBody(result.finalOutput ?? "") || proposal.body;
 }
 
+async function hydrateReplyProposal(
+  userId: string,
+  proposal: Extract<Proposal, { kind: "reply" }>,
+): Promise<Extract<Proposal, { kind: "reply" }>> {
+  if (!proposal.messageId) return proposal;
+
+  try {
+    const tenant = corsairReadonly.withTenant(userId);
+    const message = (await tenant.gmail.api.messages.get({
+      id: proposal.messageId,
+      format: "full",
+    })) as GmailHeaderMessage;
+    const headers = message.payload?.headers;
+    const from = parseAddress(getHeader(headers, "From"));
+    const subject = getHeader(headers, "Subject");
+    const messageIdHeader = getHeader(headers, "Message-ID");
+    const references = getHeader(headers, "References");
+
+    return {
+      ...proposal,
+      to: from.email || proposal.to,
+      subject: subject ? toReplySubject(subject) : proposal.subject,
+      threadId: message.threadId ?? proposal.threadId,
+      inReplyTo: proposal.inReplyTo ?? messageIdHeader,
+      references:
+        proposal.references ??
+        toReplyReferences(references, messageIdHeader) ??
+        undefined,
+    };
+  } catch (error) {
+    console.warn("Failed to hydrate chat reply proposal:", error);
+    return proposal;
+  }
+}
+
 async function loadMessages(
   conversationId: string,
 ): Promise<ChatMessagePayload[]> {
@@ -222,6 +265,51 @@ export const chatRouter = createTRPCRouter({
         .limit(1);
       if (!conversation) return { messages: [] as ChatMessagePayload[] };
       return { messages: await loadMessages(input.conversationId) };
+    }),
+
+  markApprovalSent: protectedProcedure
+    .input(z.object({ messageId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const [message] = await db
+        .select({
+          id: chatMessage.id,
+          type: chatMessage.type,
+          content: chatMessage.content,
+          conversationId: chatMessage.conversationId,
+        })
+        .from(chatMessage)
+        .innerJoin(
+          chatConversation,
+          eq(chatMessage.conversationId, chatConversation.id),
+        )
+        .where(
+          and(
+            eq(chatMessage.id, input.messageId),
+            eq(chatConversation.userId, ctx.session.user.id),
+          ),
+        )
+        .limit(1);
+
+      if (!message || message.type !== "approval") {
+        return { updated: false as const };
+      }
+
+      const content = message.content as Extract<
+        ChatMessagePayload,
+        { type: "approval" }
+      >["content"];
+      const nextContent = {
+        ...content,
+        status: "sent" as const,
+        sentAt: new Date().toISOString(),
+      };
+
+      await db
+        .update(chatMessage)
+        .set({ content: nextContent })
+        .where(eq(chatMessage.id, input.messageId));
+
+      return { updated: true as const, content: nextContent };
     }),
 
   send: protectedProcedure
@@ -323,7 +411,10 @@ export const chatRouter = createTRPCRouter({
         if (!proposal) continue;
         const finalProposal: Proposal =
           proposal.kind === "reply"
-            ? { ...proposal, body: await draftReplyInVoice(userId, proposal) }
+            ? await hydrateReplyProposal(userId, {
+                ...proposal,
+                body: await draftReplyInVoice(userId, proposal),
+              })
             : proposal;
         newMessages.push(
           await insertMessage(conversationId, {

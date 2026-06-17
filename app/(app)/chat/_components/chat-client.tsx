@@ -2,6 +2,7 @@
 
 import {
   CalendarPlus,
+  CheckCircle2,
   History,
   Loader2,
   Mail,
@@ -11,7 +12,7 @@ import {
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-
+import { toast } from "sonner";
 import { InviteDialog, type InviteDraft } from "@/components/invite-dialog";
 import { ReplyDialog, type ReplyDraft } from "@/components/reply-dialog";
 import { Button } from "@/components/ui/button";
@@ -38,10 +39,6 @@ import { api } from "@/trpc/react";
  */
 
 type ChatMessage = RouterOutputs["chat"]["send"]["messages"][number];
-type Proposal = Extract<
-  ChatMessage,
-  { type: "approval" }
->["content"]["proposal"];
 
 const SUGGESTIONS = [
   "Find emails that need a reply",
@@ -96,20 +93,26 @@ export function ChatClient() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [replyDraft, setReplyDraft] = useState<ReplyDraft | null>(null);
   const [replyOpen, setReplyOpen] = useState(false);
+  const [activeApprovalId, setActiveApprovalId] = useState<string | null>(null);
+  const hydratedConversationRef = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const conversations = api.chat.conversations.useQuery();
+  const markApprovalSent = api.chat.markApprovalSent.useMutation();
 
   const history = api.chat.messages.useQuery(
     { conversationId: conversationId ?? "" },
     { enabled: Boolean(conversationId) },
   );
 
-  // Seed the thread from server history (initial load / reload). Skipped once a
-  // turn is in flight so the optimistic bubbles aren't clobbered.
+  // Seed the thread from server history only when a conversation is first
+  // loaded/switched. Mutation responses already return the canonical new rows.
   const send = api.chat.send.useMutation();
   useEffect(() => {
-    if (history.data && !send.isPending) setMessages(history.data.messages);
-  }, [history.data, send.isPending]);
+    if (!conversationId || !history.data) return;
+    if (hydratedConversationRef.current === conversationId) return;
+    setMessages(history.data.messages);
+    hydratedConversationRef.current = conversationId;
+  }, [conversationId, history.data]);
 
   // Keep pinned to the newest message.
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll on count + pending
@@ -121,11 +124,12 @@ export function ChatClient() {
     const trimmed = prompt.trim();
     if (!trimmed || send.isPending) return;
     setInput("");
+    const optimisticId = `optimistic-${Date.now()}`;
     // Optimistic user bubble; the canonical row arrives with the response.
     setMessages((prev) => [
       ...prev,
       {
-        id: `optimistic-${Date.now()}`,
+        id: optimisticId,
         role: "user",
         type: "text",
         content: { text: trimmed },
@@ -138,13 +142,21 @@ export function ChatClient() {
         onSuccess: (res) => {
           if (res.conversationId !== conversationId) {
             setConversationId(res.conversationId);
-            router.replace(`/chat?c=${res.conversationId}`);
+            window.history.replaceState(
+              null,
+              "",
+              `/chat?c=${res.conversationId}`,
+            );
           }
-          setMessages((prev) => [
-            ...prev,
-            ...res.messages.filter((m) => m.role === "assistant"),
-          ]);
+          setMessages((prev) => {
+            const withoutOptimistic = prev.filter((m) => m.id !== optimisticId);
+            return [...withoutOptimistic, ...res.messages];
+          });
+          hydratedConversationRef.current = res.conversationId;
           void conversations.refetch();
+        },
+        onError: (err) => {
+          toast.error("Couldn't send message", { description: err.message });
         },
       },
     );
@@ -152,19 +164,23 @@ export function ChatClient() {
 
   function openConversation(id: string) {
     if (id === conversationId) return;
+    hydratedConversationRef.current = null;
     setConversationId(id);
     setMessages([]);
     router.replace(`/chat?c=${id}`);
   }
 
   function newChat() {
+    hydratedConversationRef.current = null;
     setConversationId(null);
     setMessages([]);
     setInput("");
     router.replace("/chat");
   }
 
-  function approve(proposal: Proposal) {
+  function approve(message: Extract<ChatMessage, { type: "approval" }>) {
+    const proposal = message.content.proposal;
+    if (message.content.status === "sent") return;
     if (proposal.kind === "invite") {
       setInviteDraft({
         summary: proposal.summary,
@@ -176,17 +192,36 @@ export function ChatClient() {
       setInviteOpen(true);
       return;
     }
-    if (!proposal.threadId) return;
+    setActiveApprovalId(message.id);
     setReplyDraft({
       to: proposal.to,
       subject: proposal.subject,
       body: proposal.body,
-      threadId: proposal.threadId,
+      threadId: proposal.threadId ?? null,
       messageId: proposal.messageId,
       inReplyTo: proposal.inReplyTo,
       references: proposal.references,
     });
     setReplyOpen(true);
+  }
+
+  function markActiveApprovalSent() {
+    if (!activeApprovalId) return;
+    const sentAt = new Date().toISOString();
+    const messageId = activeApprovalId;
+    setMessages((prev) =>
+      prev.map((message) => {
+        if (message.id !== messageId || message.type !== "approval") {
+          return message;
+        }
+        return {
+          ...message,
+          content: { ...message.content, status: "sent", sentAt },
+        };
+      }),
+    );
+    markApprovalSent.mutate({ messageId });
+    setActiveApprovalId(null);
   }
 
   const isEmpty = messages.length === 0 && !send.isPending;
@@ -340,6 +375,7 @@ export function ChatClient() {
         open={replyOpen}
         onOpenChange={setReplyOpen}
         draft={replyDraft}
+        onSent={markActiveApprovalSent}
       />
     </div>
   );
@@ -351,7 +387,7 @@ function MessageRow({
   onPickEmail,
 }: {
   message: ChatMessage;
-  onApprove: (proposal: Proposal) => void;
+  onApprove: (message: Extract<ChatMessage, { type: "approval" }>) => void;
   onPickEmail: (label: string) => void;
 }) {
   if (message.type === "text") {
@@ -418,7 +454,7 @@ function MessageRow({
 
   // approval
   const proposal = message.content.proposal;
-  const canApprove = proposal.kind === "invite" || Boolean(proposal.threadId);
+  const sent = message.content.status === "sent";
   return (
     <div className="rounded-xl border border-border bg-muted/40 p-3">
       <div className="flex items-start justify-between gap-3">
@@ -449,9 +485,7 @@ function MessageRow({
               <p className="line-clamp-3 whitespace-pre-wrap">
                 {proposal.body}
               </p>
-              {!proposal.threadId ? (
-                <p>Open a Gmail thread before sending.</p>
-              ) : null}
+              {sent ? <p>Sent to Gmail.</p> : null}
             </div>
           )}
         </div>
@@ -459,15 +493,17 @@ function MessageRow({
           type="button"
           size="sm"
           variant="secondary"
-          disabled={!canApprove}
-          onClick={() => onApprove(proposal)}
+          disabled={sent}
+          onClick={() => onApprove(message)}
         >
-          {proposal.kind === "invite" ? (
+          {sent ? (
+            <CheckCircle2 className="size-4" />
+          ) : proposal.kind === "invite" ? (
             <CalendarPlus className="size-4" />
           ) : (
             <Send className="size-4" />
           )}
-          Review
+          {sent ? "Sent" : "Review"}
         </Button>
       </div>
     </div>

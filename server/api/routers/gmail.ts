@@ -805,6 +805,46 @@ export const gmailRouter = createTRPCRouter({
    * Send a plain-text reply in the existing Gmail thread. The raw message is
    * built locally as RFC 2822 and sent only after the user's explicit approval.
    */
+  sendEmail: protectedProcedure
+    .input(
+      z.object({
+        to: z.string().email(),
+        subject: z.string().min(1),
+        body: z.string().min(1),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      const tenant = corsair.withTenant(userId);
+      const sent = await tenant.gmail.api.messages.send({
+        raw: buildRfc2822ReplyRaw({
+          to: input.to,
+          subject: input.subject,
+          body: input.body,
+        }),
+      });
+
+      if (sent.id) {
+        try {
+          await upsertSentEmbedding({
+            tenantId: userId,
+            entityId: `${userId}:${sent.id}`,
+            to: input.to,
+            subject: input.subject,
+            text: input.body,
+            date: new Date().toISOString(),
+          });
+        } catch (error) {
+          console.warn("Failed to embed sent email for voice store:", error);
+        }
+      }
+
+      return {
+        id: sent.id ?? null,
+        threadId: sent.threadId ?? null,
+      };
+    }),
+
   sendReply: protectedProcedure
     .input(
       z.object({
