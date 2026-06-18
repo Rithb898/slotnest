@@ -23,6 +23,7 @@ import {
   useEffect,
   useState,
 } from "react";
+import { BillingUpgradeButton } from "@/components/billing-upgrade-button";
 import { InviteDialog, type InviteDraft } from "@/components/invite-dialog";
 import { ReplyDialog, type ReplyDraft } from "@/components/reply-dialog";
 import { Button } from "@/components/ui/button";
@@ -66,6 +67,7 @@ const GOTO: Record<string, Route> = {
   a: "/chat",
   i: "/inbox",
   c: "/calendar",
+  d: "/drafts",
   w: "/waiting",
 };
 
@@ -115,6 +117,15 @@ export function CommandBar({ children }: { children?: React.ReactNode }) {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [replyDraft, setReplyDraft] = useState<ReplyDraft | null>(null);
   const [replyOpen, setReplyOpen] = useState(false);
+  const connections = api.connections.list.useQuery();
+  const billingEnabled =
+    connections.isSuccess && (connections.data?.length ?? 0) > 0;
+  const billing = api.billing.summary.useQuery(undefined, {
+    enabled: billingEnabled,
+  });
+  const aiBudget = billing.data?.aiActionBudget ?? null;
+  const aiBudgetExhausted = aiBudget?.exhausted ?? false;
+  const canUpgrade = billing.data?.currentPlan.name !== "pro";
 
   const ask = api.agent.ask.useMutation({
     onSuccess: (res) => {
@@ -129,7 +140,7 @@ export function CommandBar({ children }: { children?: React.ReactNode }) {
 
   const toggle = useCallback(() => setOpen((o) => !o), []);
 
-  // Global shortcuts: ⌘K opens the bar; `g` then t/i/c jumps to a surface
+  // Global shortcuts: ⌘K opens the bar; `g` then t/i/c/d/w jumps to a surface
   // (the chord the command bar advertises). Discoverable, never required —
   // and skipped while typing in any field.
   useEffect(() => {
@@ -214,10 +225,15 @@ export function CommandBar({ children }: { children?: React.ReactNode }) {
 
   const runAgent = useCallback(() => {
     if (!trimmed) return;
+    if (aiBudgetExhausted) {
+      setAnswer("AI action budget exhausted. Upgrade to keep asking SlotNest.");
+      setProposals([]);
+      return;
+    }
     setAnswer(null);
     setProposals([]);
     ask.mutate({ prompt: trimmed });
-  }, [trimmed, ask]);
+  }, [trimmed, ask, aiBudgetExhausted]);
 
   const approveProposal = useCallback((proposal: AgentProposal) => {
     setOpen(false);
@@ -261,20 +277,36 @@ export function CommandBar({ children }: { children?: React.ReactNode }) {
         <CommandList>
           <CommandEmpty>
             {trimmed ? (
-              <button
-                type="button"
-                onClick={runAgent}
-                className="mx-auto flex items-center gap-2 text-sm"
-              >
-                <Sparkles className="size-4" />
-                Ask SlotNest: &ldquo;{trimmed}&rdquo;
-              </button>
+              aiBudgetExhausted ? (
+                <div className="mx-auto flex max-w-sm flex-col items-center gap-2 py-2 text-center">
+                  <p className="text-sm font-medium">AI budget exhausted</p>
+                  <p className="text-xs text-muted-foreground">
+                    Upgrade to keep asking SlotNest.
+                  </p>
+                  {canUpgrade ? (
+                    <BillingUpgradeButton
+                      label="Upgrade now"
+                      size="sm"
+                      className="mt-1"
+                    />
+                  ) : null}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={runAgent}
+                  className="mx-auto flex items-center gap-2 text-sm"
+                >
+                  <Sparkles className="size-4" />
+                  Ask SlotNest: &ldquo;{trimmed}&rdquo;
+                </button>
+              )
             ) : (
               "No matching command."
             )}
           </CommandEmpty>
 
-          {looksLikeSentence ? (
+          {looksLikeSentence && !aiBudgetExhausted ? (
             <CommandGroup heading="Ask SlotNest">
               <CommandItem
                 // Force-match so cmdk keeps it visible for any sentence.
@@ -293,6 +325,24 @@ export function CommandBar({ children }: { children?: React.ReactNode }) {
                 <CommandShortcut>↵</CommandShortcut>
               </CommandItem>
             </CommandGroup>
+          ) : null}
+
+          {looksLikeSentence && aiBudgetExhausted ? (
+            <div className="border-t border-border px-3 py-3">
+              <div className="rounded-2xl border border-border bg-muted/30 px-3 py-3 text-sm">
+                <div className="font-medium">AI budget exhausted</div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  Upgrade to keep asking SlotNest.
+                </div>
+                {canUpgrade ? (
+                  <BillingUpgradeButton
+                    label="Upgrade now"
+                    size="sm"
+                    className="mt-3"
+                  />
+                ) : null}
+              </div>
+            </div>
           ) : null}
 
           {answer ? (
@@ -424,6 +474,11 @@ export function CommandBar({ children }: { children?: React.ReactNode }) {
               <CalendarDays />
               <span>Calendar</span>
               <CommandShortcut>g c</CommandShortcut>
+            </CommandItem>
+            <CommandItem onSelect={() => go("/drafts")}>
+              <PenLine />
+              <span>Drafts</span>
+              <CommandShortcut>g d</CommandShortcut>
             </CommandItem>
             <CommandItem onSelect={() => go("/waiting")}>
               <Send />

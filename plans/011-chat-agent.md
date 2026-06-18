@@ -16,7 +16,7 @@
 - **Depends on**: 004 (send), 005 (draft), 008 (Qdrant), 009 (proposal schema)
 - **Category**: product / AI workflow
 - **Planned at**: 2026-06-16
-- **Status**: TODO
+- **Status**: DONE
 
 ## Confirmed product direction (grill-with-docs, 2026-06-16)
 

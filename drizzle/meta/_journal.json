@@ -43,6 +43,13 @@
       "when": 1781690716497,
       "tag": "0005_settings_trust_billing_razorpay",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1781769451313,
+      "tag": "0006_shared_ai_action_budget",
+      "breakpoints": true
     }
   ]
 }

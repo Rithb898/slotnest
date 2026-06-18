@@ -17,6 +17,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { BillingUpgradeButton } from "@/components/billing-upgrade-button";
 import { InviteDialog, type InviteDraft } from "@/components/invite-dialog";
 import { ReplyDialog, type ReplyDraft } from "@/components/reply-dialog";
 import { Button } from "@/components/ui/button";
@@ -103,10 +104,18 @@ export function ChatClient() {
   const conversations = api.chat.conversations.useQuery();
   const markApprovalSent = api.chat.markApprovalSent.useMutation();
   const connections = api.connections.list.useQuery();
+  const billingEnabled =
+    connections.isSuccess && (connections.data?.length ?? 0) > 0;
+  const billing = api.billing.summary.useQuery(undefined, {
+    enabled: billingEnabled,
+  });
   const gmailConnected = connections.data?.includes("gmail") ?? false;
   const calendarConnected =
     connections.data?.includes("googlecalendar") ?? false;
   const hasAnyConnection = gmailConnected || calendarConnected;
+  const aiBudget = billing.data?.aiActionBudget ?? null;
+  const aiBudgetExhausted = aiBudget?.exhausted ?? false;
+  const canUpgrade = billing.data?.currentPlan.name !== "pro";
 
   const history = api.chat.messages.useQuery(
     { conversationId: conversationId ?? "" },
@@ -135,6 +144,12 @@ export function ChatClient() {
       if (!hasAnyConnection) {
         toast.error("Connect Gmail or Calendar first.");
       }
+      return;
+    }
+    if (aiBudgetExhausted) {
+      toast.error("AI action budget exhausted.", {
+        description: "Upgrade to keep using Chat.",
+      });
       return;
     }
     setInput("");
@@ -452,6 +467,23 @@ export function ChatClient() {
               </div>
             </div>
           ) : null}
+          {connections.isSuccess && hasAnyConnection && aiBudgetExhausted ? (
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-border/70 bg-card px-4 py-3 shadow-sm">
+              <div className="min-w-0">
+                <p className="text-sm font-medium">AI budget exhausted</p>
+                <p className="text-xs text-muted-foreground">
+                  Chat history stays readable, but new prompts wait until the
+                  shared budget resets.
+                </p>
+              </div>
+              {canUpgrade ? (
+                <BillingUpgradeButton
+                  label="Upgrade to keep chatting"
+                  size="sm"
+                />
+              ) : null}
+            </div>
+          ) : null}
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -470,18 +502,27 @@ export function ChatClient() {
               }}
               rows={1}
               placeholder={
-                hasAnyConnection
-                  ? "Ask SlotNest to find, draft, or schedule..."
-                  : "Connect Gmail or Calendar to start chatting..."
+                aiBudgetExhausted
+                  ? "AI budget exhausted. Upgrade to keep chatting..."
+                  : hasAnyConnection
+                    ? "Ask SlotNest to find, draft, or schedule..."
+                    : "Connect Gmail or Calendar to start chatting..."
               }
-              disabled={!hasAnyConnection || send.isPending}
+              disabled={
+                !hasAnyConnection || send.isPending || aiBudgetExhausted
+              }
               className="max-h-40 min-h-11 flex-1 resize-none rounded-2xl border-0 bg-transparent px-3 py-3 text-sm leading-5 outline-none placeholder:text-muted-foreground/70 focus-visible:ring-0 disabled:cursor-not-allowed"
             />
             <Button
               type="submit"
               variant="default"
               size="icon-lg"
-              disabled={!input.trim() || send.isPending || !hasAnyConnection}
+              disabled={
+                !input.trim() ||
+                send.isPending ||
+                !hasAnyConnection ||
+                aiBudgetExhausted
+              }
               aria-label="Send"
               className="rounded-2xl shadow-sm"
             >
@@ -628,6 +669,11 @@ function MessageRow({
           <div className="flex items-center justify-between gap-3 border-b border-border/70 px-4 py-3">
             <div>
               <p className="text-sm font-semibold">Mail found</p>
+              {message.content.intro ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {message.content.intro}
+                </p>
+              ) : null}
               <p className="text-xs text-muted-foreground">
                 {message.content.emails.length} email
                 {message.content.emails.length === 1 ? "" : "s"} ready for

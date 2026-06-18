@@ -6,6 +6,7 @@ import { z } from "zod";
 import { env } from "@/lib/config/env";
 import { DAILY_BRIEF_INSTRUCTIONS } from "@/lib/prompts";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
+import { reserveAiActionBudget } from "@/server/billing/ai-action-budget";
 import { db } from "@/server/db";
 import { dailyBrief as dailyBriefTable } from "@/server/db/schema";
 
@@ -154,6 +155,12 @@ export const workspaceRouter = createTRPCRouter({
         name: "slotnest-daily-brief",
         model: BRIEF_MODEL,
         instructions: DAILY_BRIEF_INSTRUCTIONS,
+      });
+
+      await reserveAiActionBudget(db, userId, {
+        actionKind: "workspace.dailyBrief",
+        source: "server/api/routers/workspace.ts:dailyBrief",
+        model: BRIEF_MODEL,
       });
 
       const result = await run(

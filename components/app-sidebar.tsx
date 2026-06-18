@@ -7,6 +7,7 @@ import {
   LogOut,
   MailCheck,
   MessageSquare,
+  PenLine,
   Plug,
   Search,
   Send,
@@ -55,6 +56,7 @@ import {
 import { useIsMac } from "@/hooks/use-is-mac";
 import { CALENDAR_POLL_OPTIONS, INBOX_POLL_OPTIONS } from "@/lib/query-options";
 import { cn } from "@/lib/utils";
+import { isWaitingMessage } from "@/lib/workspace";
 import { authClient } from "@/server/auth/client";
 import { api } from "@/trpc/react";
 
@@ -67,11 +69,12 @@ type NavItem = {
 
 const PRIMARY: NavItem[] = [
   { href: "/today", label: "Today", icon: Sun, shortcut: "G T" },
-  { href: "/chat", label: "Chat", icon: MessageSquare, shortcut: "G A" },
   { href: "/inbox", label: "Inbox", icon: Inbox, shortcut: "G I" },
-  { href: "/sent", label: "Sent", icon: MailCheck, shortcut: "G S" },
   { href: "/calendar", label: "Calendar", icon: CalendarDays, shortcut: "G C" },
+  { href: "/drafts", label: "Drafts", icon: PenLine, shortcut: "G D" },
   { href: "/waiting", label: "Waiting", icon: Send, shortcut: "G W" },
+  { href: "/chat", label: "Chat", icon: MessageSquare, shortcut: "G A" },
+  { href: "/sent", label: "Sent", icon: MailCheck, shortcut: "G S" },
 ];
 
 const SECONDARY: NavItem[] = [
@@ -105,21 +108,40 @@ function isToday(date: Date): boolean {
   );
 }
 
+function formatBudgetReset(resetAt: Date) {
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "UTC",
+    timeZoneName: "short",
+  }).format(resetAt);
+}
+
 export function AppSidebar() {
   const pathname = usePathname();
   const { setOpen } = useCommandBar();
   const isMac = useIsMac();
 
   const connections = api.connections.list.useQuery();
-  const billing = api.billing.summary.useQuery();
   const gmailConnected = connections.data?.includes("gmail") ?? false;
   const calendarConnected =
     connections.data?.includes("googlecalendar") ?? false;
+  const billingEnabled =
+    connections.isSuccess && (connections.data?.length ?? 0) > 0;
+  const billing = api.billing.summary.useQuery(undefined, {
+    enabled: billingEnabled,
+  });
   const inbox = api.gmail.inbox.useQuery(
     {},
     { ...INBOX_POLL_OPTIONS, enabled: gmailConnected },
   );
 
+  const draftsCount =
+    inbox.data?.messages.filter(
+      (m) => m.replyStatus && m.replyStatus !== "sent",
+    ).length ?? 0;
   const [todayRange, setTodayRange] = useState<{
     timeMin: string;
     timeMax: string;
@@ -140,18 +162,7 @@ export function AppSidebar() {
       (m) => m.triage.action === "Needs reply" && m.replyStatus !== "sent",
     ).length ?? 0;
   const waitingCount =
-    inbox.data?.messages.filter((m) => {
-      const text = `${m.subject} ${m.snippet}`.toLowerCase();
-      return (
-        m.triage.action !== "Needs reply" &&
-        (text.includes("follow up") ||
-          text.includes("following up") ||
-          text.includes("waiting") ||
-          text.includes("checking in") ||
-          text.includes("reminder") ||
-          text.includes("any update"))
-      );
-    }).length ?? 0;
+    inbox.data?.messages.filter(isWaitingMessage).length ?? 0;
   const hasUrgent =
     inbox.data?.messages.some(
       (m) => m.triage.action === "Needs reply" && m.triage.urgency === "Urgent",
@@ -166,12 +177,15 @@ export function AppSidebar() {
   const health = connectionHealth(connections.data);
   const { state } = useSidebar();
   const plan = billing.data?.currentPlan ?? null;
+  const aiBudget = billing.data?.aiActionBudget ?? null;
 
   function trailingFor(href: string): React.ReactNode {
     if (href === "/today")
       return <CountBadge count={needsYou} urgent={hasUrgent} />;
     if (href === "/inbox")
       return <CountBadge count={needsYou} urgent={hasUrgent} />;
+    if (href === "/drafts")
+      return <CountBadge count={draftsCount} tone="muted" />;
     if (href === "/calendar" && todayCount > 0) {
       return <CountBadge count={todayCount} tone="muted" />;
     }
@@ -314,6 +328,23 @@ export function AppSidebar() {
                   <div className="truncate text-xs text-muted-foreground">
                     {plan?.description ??
                       "Core SlotNest access for personal use."}
+                  </div>
+                ) : null}
+                {state !== "collapsed" && aiBudget ? (
+                  <div
+                    className={cn(
+                      "mt-2 text-xs",
+                      aiBudget.exhausted
+                        ? "text-destructive"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    <div>
+                      {aiBudget.exhausted
+                        ? "AI budget exhausted"
+                        : `${aiBudget.remaining} of ${aiBudget.limit} AI actions left`}
+                    </div>
+                    <div>Resets {formatBudgetReset(aiBudget.resetAt)}</div>
                   </div>
                 ) : null}
               </div>

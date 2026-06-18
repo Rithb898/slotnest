@@ -14,7 +14,14 @@ const AUTH_ROUTES = [
 // App routes that require a session — signed-out users get sent to /sign-in.
 // NOTE: this is a UX redirect only. The real guard is `protectedProcedure` in
 // the tRPC layer (a matcher edit must never become the sole auth boundary).
-const PROTECTED_ROUTES = ["/today", "/inbox", "/calendar", "/connections"];
+const PROTECTED_ROUTES = [
+  "/today",
+  "/drafts",
+  "/waiting",
+  "/inbox",
+  "/calendar",
+  "/connections",
+];
 
 export async function proxy(request: NextRequest) {
   const session = await getSession();
@@ -51,6 +58,10 @@ export const config = {
     "/reset-password",
     "/today",
     "/today/:path*",
+    "/drafts",
+    "/drafts/:path*",
+    "/waiting",
+    "/waiting/:path*",
     "/inbox",
     "/inbox/:path*",
     "/calendar",

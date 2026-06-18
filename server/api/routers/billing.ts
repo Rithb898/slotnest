@@ -6,6 +6,7 @@ import { z } from "zod";
 import { BILLING_PLAN_CATALOG } from "@/lib/billing-plans";
 import { env } from "@/lib/config/env";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
+import { getAiActionBudgetSummary } from "@/server/billing/ai-action-budget";
 import { BILLING_PLANS } from "@/server/billing/plans";
 import { subscription } from "@/server/db/schema";
 
@@ -301,6 +302,10 @@ export const billingRouter = createTRPCRouter({
 
     const current = selectSubscription(rows);
     const syncedCurrent = current ? await syncSubscription(ctx, current) : null;
+    const aiActionBudget = await getAiActionBudgetSummary(
+      ctx.db,
+      ctx.session.user.id,
+    );
 
     return {
       subscription: syncedCurrent,
@@ -308,6 +313,7 @@ export const billingRouter = createTRPCRouter({
         syncedCurrent && hasPaidAccess(syncedCurrent.status)
           ? toPlanSummary(syncedCurrent.plan)
           : BILLING_PLAN_CATALOG.free,
+      aiActionBudget,
       availablePlans: Object.values(BILLING_PLAN_CATALOG).map((plan) => ({
         name: plan.name,
         label: plan.label,

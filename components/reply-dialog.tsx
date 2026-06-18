@@ -3,7 +3,7 @@
 import { Send, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-
+import { BillingUpgradeButton } from "@/components/billing-upgrade-button";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -48,6 +48,15 @@ export function ReplyDialog({
   const [to, setTo] = useState("");
   const [body, setBody] = useState("");
   const [aiUnavailable, setAiUnavailable] = useState(false);
+  const connections = api.connections.list.useQuery();
+  const billingEnabled =
+    connections.isSuccess && (connections.data?.length ?? 0) > 0;
+  const billing = api.billing.summary.useQuery(undefined, {
+    enabled: billingEnabled,
+  });
+  const aiBudget = billing.data?.aiActionBudget ?? null;
+  const aiBudgetExhausted = aiBudget?.exhausted ?? false;
+  const canUpgrade = billing.data?.currentPlan.name !== "pro";
 
   useEffect(() => {
     if (!open || !draft) return;
@@ -109,7 +118,8 @@ export function ReplyDialog({
   });
 
   const valid = Boolean(draft?.subject.trim() && to.trim() && body.trim());
-  const canDraftWithAi = Boolean(draft?.messageId) && !aiUnavailable;
+  const canDraftWithAi =
+    Boolean(draft?.messageId) && !aiUnavailable && !aiBudgetExhausted;
 
   function send() {
     if (!draft || !valid) return;
@@ -133,7 +143,7 @@ export function ReplyDialog({
   }
 
   function draftWithAi() {
-    if (!draft?.messageId || aiUnavailable) return;
+    if (!draft?.messageId || aiUnavailable || aiBudgetExhausted) return;
     draftReply.mutate({ messageId: draft.messageId });
   }
 
@@ -170,29 +180,41 @@ export function ReplyDialog({
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between gap-3">
               <Label htmlFor="reply-body">Message</Label>
-              <Tooltip>
-                <TooltipTrigger render={<span />}>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={draftWithAi}
-                    disabled={
-                      !canDraftWithAi ||
-                      draftReply.isPending ||
-                      sendReply.isPending ||
-                      sendEmail.isPending
-                    }
-                    className="h-8"
-                  >
-                    <Sparkles className="size-4" />
-                    {draftReply.isPending ? "Drafting..." : "Draft with AI"}
-                  </Button>
-                </TooltipTrigger>
-                {!canDraftWithAi ? (
-                  <TooltipContent>Set OPENAI_API_KEY</TooltipContent>
-                ) : null}
-              </Tooltip>
+              {aiBudgetExhausted && canUpgrade ? (
+                <BillingUpgradeButton
+                  label="Upgrade to draft"
+                  variant="secondary"
+                  size="sm"
+                />
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger render={<span />}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={draftWithAi}
+                      disabled={
+                        !canDraftWithAi ||
+                        draftReply.isPending ||
+                        sendReply.isPending ||
+                        sendEmail.isPending
+                      }
+                      className="h-8"
+                    >
+                      <Sparkles className="size-4" />
+                      {draftReply.isPending ? "Drafting..." : "Draft with AI"}
+                    </Button>
+                  </TooltipTrigger>
+                  {!canDraftWithAi ? (
+                    <TooltipContent>
+                      {aiBudgetExhausted
+                        ? "AI action budget exhausted."
+                        : "Set OPENAI_API_KEY"}
+                    </TooltipContent>
+                  ) : null}
+                </Tooltip>
+              )}
             </div>
             <Textarea
               id="reply-body"

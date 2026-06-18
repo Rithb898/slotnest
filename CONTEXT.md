@@ -18,6 +18,7 @@ The shared language for SlotNest. Terms only — no implementation details.
   - **Urgency** — How time-sensitive an email is: `Urgent` | `Normal` | `Low`.
 - **Draft reply** — A context-aware LLM-generated reply, editable before the User sends it, for `Needs reply` emails.
 - **User voice** — How the User actually writes, learned from their own Sent mail. When drafting a reply, the Agent retrieves a few of the User's past sent emails to similar recipients (recipient-scoped) and uses them as style examples so the draft reads like the User wrote it. Grounded in real sent emails, never an invented persona.
+- **AI action budget** — The shared monthly or daily allowance for expensive AI-driven work in SlotNest. Draft replies, chat turns, and other AI-assisted generation draw from the same pool so the app can cap cost without exposing separate confusing counters.
 - **Free-slot scheduling** — Finding open time on the User's calendar and proposing/sending an invite at a real free slot, from natural language.
 - **Email→invite** — A one-shot workflow turning an open email into a calendar invite to the sender (time/title extracted by LLM).
 - **Local cache** — Emails/events pushed via Corsair webhooks and persisted in Postgres; the source for fast local search (not live Gmail polling).

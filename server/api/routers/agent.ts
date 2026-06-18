@@ -5,6 +5,7 @@ import { env } from "@/lib/config/env";
 import { parseAddress } from "@/lib/gmail";
 import { AGENT_ASK_INSTRUCTIONS } from "@/lib/prompts";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
+import { reserveAiActionBudget } from "@/server/billing/ai-action-budget";
 import { corsair } from "@/server/corsair";
 
 /**
@@ -160,6 +161,12 @@ export const agentRouter = createTRPCRouter({
         instructions: AGENT_ASK_INSTRUCTIONS,
         tools,
         outputType: agentOutputSchema,
+      });
+
+      await reserveAiActionBudget(ctx.db, ctx.session.user.id, {
+        actionKind: "agent.ask",
+        source: "server/api/routers/agent.ts:ask",
+        model: "gpt-4.1-mini",
       });
 
       const result = await run(agent, input.prompt);

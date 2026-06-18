@@ -60,10 +60,12 @@ export function InviteDialog({
   open,
   onOpenChange,
   draft,
+  onSent,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   draft: InviteDraft | null;
+  onSent?: () => void;
 }) {
   const utils = api.useUtils();
   const [summary, setSummary] = useState("");
@@ -100,6 +102,7 @@ export function InviteDialog({
       });
       void utils.calendar.events.invalidate();
       void utils.calendar.availability.invalidate();
+      onSent?.();
       onOpenChange(false);
     },
     onError: (err) => {

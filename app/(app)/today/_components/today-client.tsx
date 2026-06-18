@@ -19,7 +19,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-
+import { BillingUpgradeButton } from "@/components/billing-upgrade-button";
 import { useCommandBar } from "@/components/command-bar";
 import { InviteDialog, type InviteDraft } from "@/components/invite-dialog";
 import { ReplyDialog, type ReplyDraft } from "@/components/reply-dialog";
@@ -151,6 +151,15 @@ export function TodayClient() {
     return inbox.data.messages.filter(isWaitingMessage).slice(0, 4);
   }, [inbox.data]);
 
+  const billingEnabled =
+    connections.isSuccess && (connections.data?.length ?? 0) > 0;
+  const billing = api.billing.summary.useQuery(undefined, {
+    enabled: billingEnabled,
+  });
+  const aiBudget = billing.data?.aiActionBudget ?? null;
+  const aiBudgetExhausted = aiBudget?.exhausted ?? false;
+  const canUpgrade = billing.data?.currentPlan.name !== "pro";
+
   useEffect(() => {
     if (queue.length === 0) {
       setSelectedId(null);
@@ -176,6 +185,19 @@ export function TodayClient() {
   const selectedDraftId = selected?.id ?? null;
   useEffect(() => {
     if (queue.length === 0) return;
+    if (aiBudgetExhausted) {
+      setAiDrafts((current) => {
+        let changed = false;
+        const next = { ...current };
+        for (const message of queue) {
+          if (next[message.id] !== undefined) continue;
+          next[message.id] = "";
+          changed = true;
+        }
+        return changed ? next : current;
+      });
+      return;
+    }
     setAiDrafts((current) => {
       let changed = false;
       const next = { ...current };
@@ -189,11 +211,18 @@ export function TodayClient() {
       }
       return changed ? next : current;
     });
-  }, [queue]);
+  }, [queue, aiBudgetExhausted]);
 
   useEffect(() => {
     const id = selectedDraftId;
     if (!id || !gmailConnected || requestedDrafts.current.has(id)) return;
+    if (aiBudgetExhausted) {
+      requestedDrafts.current.add(id);
+      setAiDrafts((current) =>
+        current[id] === undefined ? { ...current, [id]: "" } : current,
+      );
+      return;
+    }
     requestedDrafts.current.add(id);
     let cancelled = false;
     draftFor({ messageId: id })
@@ -214,16 +243,24 @@ export function TodayClient() {
     return () => {
       cancelled = true;
     };
-  }, [selectedDraftId, gmailConnected, draftFor]);
+  }, [selectedDraftId, gmailConnected, draftFor, aiBudgetExhausted]);
 
   const selectedDraft = selected ? aiDrafts[selected.id] : undefined;
+  const selectedReplyBody =
+    selectedDraft?.trim() || (selected ? draftPreview(selected) : "");
   const selectedDraftLoading = Boolean(
-    selected && gmailConnected && !(selected.id in aiDrafts),
+    selected &&
+      gmailConnected &&
+      !aiBudgetExhausted &&
+      !(selected.id in aiDrafts),
   );
 
   // Force a fresh AI draft, overwriting the stored one (force: true on the
   // server). Drop the cached body first so the panel shows its loading state.
   function regenerateDraft(id: string) {
+    if (aiBudgetExhausted) {
+      return;
+    }
     requestedDrafts.current.add(id);
     setAiDrafts((current) => {
       const next = { ...current };
@@ -378,6 +415,8 @@ export function TodayClient() {
                 "SlotNest is checking Gmail and Calendar for what needs approval."
               }
               highlights={brief.data?.highlights ?? []}
+              aiBudgetExhausted={aiBudgetExhausted}
+              canUpgrade={canUpgrade}
             />
           </section>
 
@@ -421,11 +460,13 @@ export function TodayClient() {
                 message={selected}
                 slot={bestSlot}
                 state={actionStates[selected.id]}
-                draftBody={selectedDraft}
+                draftBody={selectedReplyBody}
                 draftLoading={selectedDraftLoading}
+                aiBudgetExhausted={aiBudgetExhausted}
+                canUpgrade={canUpgrade}
                 onRegenerate={() => regenerateDraft(selected.id)}
-                onApprove={() => openReply(selected, selectedDraft ?? "")}
-                onEdit={() => openReply(selected, selectedDraft ?? "")}
+                onApprove={() => openReply(selected, selectedReplyBody)}
+                onEdit={() => openReply(selected, selectedReplyBody)}
                 onSkip={() => setAction(selected.id, "skipped")}
                 onSnooze={() => setAction(selected.id, "snoozed")}
                 onInvite={() => openInvite(selected, bestSlot)}
@@ -484,10 +525,14 @@ function DailyBrief({
   loading,
   text,
   highlights,
+  aiBudgetExhausted,
+  canUpgrade,
 }: {
   loading: boolean;
   text: string;
   highlights: string[];
+  aiBudgetExhausted: boolean;
+  canUpgrade: boolean;
 }) {
   return (
     <div className="rounded-xl border border-border bg-card px-4 py-4 sm:px-5">
@@ -505,6 +550,20 @@ function DailyBrief({
                 </span>
               ) : null}
             </div>
+            {aiBudgetExhausted ? (
+              <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span>
+                  AI budget exhausted. Cached or deterministic brief only.
+                </span>
+                {canUpgrade ? (
+                  <BillingUpgradeButton
+                    label="Upgrade to refresh"
+                    size="sm"
+                    variant="secondary"
+                  />
+                ) : null}
+              </div>
+            ) : null}
             {loading ? (
               <Skeleton className="h-5 max-w-2xl" />
             ) : (
@@ -598,6 +657,8 @@ function DecisionPanel({
   state,
   draftBody,
   draftLoading,
+  aiBudgetExhausted,
+  canUpgrade,
   onRegenerate,
   onApprove,
   onEdit,
@@ -611,6 +672,8 @@ function DecisionPanel({
   state?: ActionState;
   draftBody?: string;
   draftLoading?: boolean;
+  aiBudgetExhausted: boolean;
+  canUpgrade: boolean;
   onRegenerate: () => void;
   onApprove: () => void;
   onEdit: () => void;
@@ -655,20 +718,32 @@ function DecisionPanel({
             <div className="flex items-center gap-1">
               <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
                 <Sparkles className="size-3 text-[var(--honey-ink)]" />
-                {draftLoading ? "Drafting…" : "AI draft"}
+                {aiBudgetExhausted
+                  ? "AI draft locked"
+                  : draftLoading
+                    ? "Drafting…"
+                    : "AI draft"}
               </span>
-              <Button
-                variant="ghost"
-                size="xs"
-                onClick={onRegenerate}
-                disabled={draftLoading}
-                aria-label="Regenerate draft"
-              >
-                <RefreshCw
-                  className={cn("size-3.5", draftLoading && "animate-spin")}
+              {aiBudgetExhausted && canUpgrade ? (
+                <BillingUpgradeButton
+                  label="Upgrade to regenerate"
+                  size="sm"
+                  variant="secondary"
                 />
-                Regenerate
-              </Button>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={onRegenerate}
+                  disabled={draftLoading || aiBudgetExhausted}
+                  aria-label="Regenerate draft"
+                >
+                  <RefreshCw
+                    className={cn("size-3.5", draftLoading && "animate-spin")}
+                  />
+                  Regenerate
+                </Button>
+              )}
             </div>
           </div>
           {draftLoading ? (

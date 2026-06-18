@@ -24,6 +24,7 @@ import { upsertSentEmbedding } from "@/lib/sent-embeddings";
 import { type Triage, triage } from "@/lib/triage";
 import { classifyTriage } from "@/lib/triage-llm";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
+import { reserveAiActionBudget } from "@/server/billing/ai-action-budget";
 import { corsair } from "@/server/corsair";
 import { db } from "@/server/db";
 import {
@@ -1123,6 +1124,12 @@ Subject: ${sourceMessage.subject}
 ${sourceText.slice(0, 8000)}
 
 Write the reply body now.`;
+
+      await reserveAiActionBudget(db, userId, {
+        actionKind: "gmail.draftReply",
+        source: "server/api/routers/gmail.ts:draftReply",
+        model: DRAFT_MODEL,
+      });
 
       const result = await run(agent, prompt);
       const text = cleanDraftText(result.finalOutput ?? "");

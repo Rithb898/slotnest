@@ -18,9 +18,10 @@ honor its STOP conditions, and update your row when done.
 | 007  | LLM triage on ingest — real two-axis classification | P1 | M | 006 | DONE (code complete with user-requested no-webhook deviation: added `message_triage`, strict `gpt-4.1-mini` classifier with heuristic fallback, and persisted read-through triage from Gmail fetches keyed to `corsair_entities.id`. Future reads use stored labels; absent entity/cache rows fall back to heuristic. Gates: `pnpm exec drizzle-kit generate`, focused Biome on touched TS files, and focused `tsc` via `/tmp/slotnest-tsconfig-007.json` passed. `build`/`dev` not run per repo instruction.) |
 | 008  | Hybrid search — Qdrant semantic + Postgres keyword | P1 | L | 006 | DONE (code complete: Qdrant collection-backed semantic embeddings with OpenAI `text-embedding-3-small`, webhook ingest upsert, backfill script, tenant-scoped `gmail.search` with Corsair keyword + Qdrant semantic merge, and ⌘K mail results. Postgres remains source of truth; no pgvector migration required. Gates: `pnpm add @qdrant/js-client-rest`, focused Biome clean, focused `tsc` via `/tmp/slotnest-tsconfig-008.json` passed. Full `tsc --noEmit` still fails on unrelated `convix-pr-agency-hero` missing Vite deps.) |
 | 009  | Agent propose → approve → execute (hero "one sentence" flow) | P2 | M | 004 | DONE (code complete: `agent.ask` now returns Zod-validated structured invite/reply proposals via Agents SDK `outputType`; ⌘K renders approval cards; Approve opens the existing `InviteDialog` / `ReplyDialog`, so actual writes still go through `calendar.createEvent` / `gmail.sendReply` behind a human keypress. Gates: focused Biome clean on touched files; `pnpm exec tsc --noEmit` only fails on unrelated `convix-pr-agency-hero` missing Vite deps. `build`/`dev` not run per repo instruction.) |
-| 010  | AI-native daily workspace and retention loop | P0 | L | 003, 004, 005, 009 | TODO |
-| 011  | Chat — the conversational AI agent (`/chat`) | P0 | L | 004, 005, 008, 009 | TODO |
+| 010  | AI-native daily workspace and retention loop | P0 | L | 003, 004, 005, 009 | DONE (code complete for the confirmed slice: `/today` is the AI workspace with daily brief, prioritized queue, action panel, and waiting rail; `/drafts` is now a first-class approval queue backed by real Gmail draft data and invite proposals; `/waiting` remains a first-class workflow page; sidebar, command bar, and proxy all route to the new surfaces. Gates: focused Biome clean on touched files; `tsc --noEmit` still has unrelated baseline errors outside the touched slice. `build`/`dev` not run per repo instruction.) |
+| 011  | Chat — the conversational AI agent (`/chat`) | P0 | L | 004, 005, 008, 009 | DONE (code complete for the confirmed slice: `/chat` persists conversation history and renders typed text/email-list/approval messages; the agent now uses curated read-only Gmail/Calendar tools, stored email IDs, and approval-gated outbound actions. Gates: focused static verification only; `build`/`dev` not run per repo instruction.) |
 | 012  | Settings, trust, and Razorpay billing | P1 | M | 001, 003, 010 | TODO |
+| 013  | One shared AI action budget across all model calls | P1 | L | 005, 009, 010, 011 | DONE (shared daily/monthly AI budget ledger + atomic reservation helper, billing summary exposure, server-side charging for agent/chat/draft/brief, UI lock states, focused budget test, and migration artifact added; `tsc --noEmit` still has unrelated baseline errors outside the touched slice) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
@@ -57,6 +58,9 @@ Suggested order: 004, then 006 (user, in parallel), then 005, 007, 008, 009.
 - Corsair already maintains `corsair_entities` + `*.db.*` (DB is wired in
   `server/corsair.ts`); 006 is mostly "turn on webhooks + switch reads to
   `.db.*`", not a sync layer from scratch.
+- 013 is the shared cost-control layer for the current AI entry points
+  (`agent.ask`, `chat.send`, `gmail.draftReply`, `workspace.dailyBrief`); land
+  it before any new model-powered surface is added.
 
 ## Findings considered and rejected
 
