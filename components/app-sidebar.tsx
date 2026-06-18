@@ -439,7 +439,7 @@ function AccountMenu({ health }: { health?: ConnHealth | null }) {
 
   async function handleSignOut() {
     await authClient.signOut();
-    router.push("/sign-in");
+    window.location.assign("/sign-in");
   }
 
   return (

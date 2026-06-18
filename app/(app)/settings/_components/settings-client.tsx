@@ -675,7 +675,7 @@ function AccountPanel() {
   async function handleSignOut() {
     setSigningOut(true);
     await authClient.signOut();
-    router.push("/sign-in");
+    window.location.assign("/sign-in");
   }
 
   return (
