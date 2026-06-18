@@ -24,6 +24,11 @@ honor its STOP conditions, and update your row when done.
 | 013  | One shared AI action budget across all model calls | P1 | L | 005, 009, 010, 011 | DONE (shared daily/monthly AI budget ledger + atomic reservation helper, billing summary exposure, server-side charging for agent/chat/draft/brief, UI lock states, focused budget test, and migration artifact added; `tsc --noEmit` still has unrelated baseline errors outside the touched slice) |
 | 014  | Admin-only settings tab for user search and manual subscription upgrades | P2 | M | 012, 013 | DONE (server-gated admin tab, bounded user search, manual Pro upgrade mutation, and focused verification complete) |
 | 015  | Approval-loop completion for the better Gmail client | P0 | L | 004, 005, 008, 010, 011 | DONE (approval-state persistence added via `approval_state`, Inbox archive/thread view/URL selection and Command Bar compose are live, Today/Drafts/Waiting now persist done/skip/snooze/resolve decisions, focused Biome clean, `pnpm exec drizzle-kit generate`, `pnpm exec tsx lib/approval-state.test.ts`, `pnpm exec tsc --noEmit`, and `git diff --check` all passed; `build`/`dev` not run per repo instruction.) |
+| 016  | Establish a supported static verification baseline without `dev` or `build` | P1 | M | — | DONE (supported static baseline added: `pnpm typecheck`, `pnpm test`, `pnpm verify`; `pnpm verify` exits 0, focused `lib/admin.test.ts` now matches the current `ADMIN_EMAIL`, and README documents the no-`dev`/no-`build` workflow) |
+| 017  | Charge Chat AI budget consistently for both chat turns and voice rewrites | P1 | S | 016 | DONE (chat turns and voice rewrites now reserve the shared AI budget before each model call via a narrow helper, with focused sequencing coverage in `server/api/routers/chat.test.ts`; `pnpm verify` passed) |
+| 018  | Fix inbox pagination so cached and live pages use compatible tokens | P1 | S | 016 | DONE (cached inbox cursors now use a reserved `cache:` prefix, live Gmail cursors stay opaque, and the focused regression test passes; `pnpm verify` exits 0) |
+| 019  | Make calendar availability and free-slot math honor the requested timezone | P1 | M | 016 | DONE (shared timezone-safe free-slot helper added in `lib/calendar-availability.ts`, both `calendar.availability` and chat `getFreeSlots()` now use it, focused regression coverage added for timezone-ahead and timezone-behind cases. `pnpm exec tsx lib/calendar-availability.test.ts` passes; `pnpm verify` is blocked by an unrelated existing type error in `server/api/routers/gmail.pagination-token.test.ts`.) |
+| 020  | Make calendar reads freshness-aware in the no-webhook architecture | P2 | M | 016, 019 | DONE (calendar reads now use a shared freshness policy keyed off cached row age: fresh cache stays cache-first, stale cache falls back to live, and live failures degrade to cached data when available. Added focused regression coverage in `lib/calendar-freshness.test.ts`; `pnpm exec tsx lib/calendar-freshness.test.ts` passes. `build`/`dev` not run per repo instruction.) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
@@ -69,7 +74,19 @@ Suggested order: 004, then 006 (user, in parallel), then 005, 007, 008, 009.
 - 015 completes SlotNest's better-Gmail-client approval loop without drifting
   into Gmail parity: SlotNest owns approval state, Gmail is mutated only for
   real Gmail actions such as Archive and sends.
+- 016 should land before 017-020 so executors have one honest static
+  verification contract that does not require `dev` or `build`.
+- 017 is independent of 018-020 once 016 lands; it is the fastest
+  product-and-billing correctness fix in this batch.
+- 018 is isolated to Gmail inbox paging and can land independently after 016.
+- 019 should precede 020 because the freshness plan must not preserve duplicated,
+  timezone-buggy slot math while fixing cache policy.
+- 020 must stay inside the current no-webhook architecture; do not treat it as a
+  hidden retry of the webhook plan.
 
 ## Findings considered and rejected
 
-- (none yet — this `plans/` dir was created fresh for the Corsair connect flow.)
+- Chat trust-boundary drift (`/chat` still uses MCP-provider tools instead of the
+  narrower curated read-only toolset described in ADR 0001): real concern, but
+  lower leverage than the five plans above because readonly permissions still
+  prevent writes today. Re-audit after 016-020 land.

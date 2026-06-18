@@ -11,6 +11,8 @@ import {
   toDate,
 } from "@/lib/gmail";
 import { searchMessageEmbeddings } from "@/lib/message-embeddings";
+import { buildAvailabilitySlots } from "@/lib/calendar-availability";
+import { shouldUseCachedCalendarEvents } from "@/lib/calendar-freshness";
 import { isWaitingMessage, waitingDuration } from "@/lib/workspace";
 import { corsairReadonly } from "@/server/corsair";
 import { db } from "@/server/db";
@@ -62,6 +64,12 @@ type CalendarEventLike = {
   end?: { date?: string; dateTime?: string; timeZone?: string };
   attendees?: { email?: string }[];
   calendarId?: string;
+};
+
+type CachedCalendarRow = {
+  entity_id: string;
+  createdAt?: string | Date | null;
+  data: CalendarEventLike;
 };
 
 type NormalizedCalendarEvent = {
@@ -280,10 +288,10 @@ async function getCalendarEvents({
   maxResults: number;
 }) {
   const tenant = corsairReadonly.withTenant(userId);
-  const cached = await tenant.googlecalendar.db.events.list({
+  const cached = (await tenant.googlecalendar.db.events.list({
     limit: Math.max(250, maxResults),
     offset: 0,
-  });
+  })) as CachedCalendarRow[];
 
   const toNormalizedEvent = (
     event: CalendarEventLike,
@@ -327,24 +335,28 @@ async function getCalendarEvents({
     )
     .slice(0, maxResults);
 
-  if (normalizedCached.length > 0) {
+  if (shouldUseCachedCalendarEvents(cached)) {
     return normalizedCached;
   }
 
-  const live = await tenant.googlecalendar.api.events.getMany({
-    calendarId: "primary",
-    timeMin,
-    timeMax,
-    timeZone,
-    singleEvents: true,
-    orderBy: "startTime",
-    maxResults,
-  });
+  try {
+    const live = await tenant.googlecalendar.api.events.getMany({
+      calendarId: "primary",
+      timeMin,
+      timeMax,
+      timeZone,
+      singleEvents: true,
+      orderBy: "startTime",
+      maxResults,
+    });
 
-  return (live.items ?? [])
-    .filter((event) => event.status !== "cancelled")
-    .map((event) => toNormalizedEvent(event, event.id ?? ""))
-    .slice(0, maxResults);
+    return (live.items ?? [])
+      .filter((event) => event.status !== "cancelled")
+      .map((event) => toNormalizedEvent(event, event.id ?? ""))
+      .slice(0, maxResults);
+  } catch {
+    return normalizedCached;
+  }
 }
 
 async function getFreeSlots({
@@ -386,57 +398,18 @@ async function getFreeSlots({
       }
     }
   }
-  busy.sort((a, b) => a.start - b.start);
-
-  const slots: { start: string; end: string }[] = [];
-  const rangeStart = new Date(timeMin);
-  const rangeEnd = new Date(timeMax);
-  const minMs = minMinutes * 60 * 1000;
-  const day = new Date(
-    rangeStart.getFullYear(),
-    rangeStart.getMonth(),
-    rangeStart.getDate(),
-  );
-
-  while (day <= rangeEnd) {
-    const windowStart = new Date(day);
-    windowStart.setHours(dayStartHour, 0, 0, 0);
-    const windowEnd = new Date(day);
-    windowEnd.setHours(dayEndHour, 0, 0, 0);
-
-    let cursor = Math.max(windowStart.getTime(), rangeStart.getTime());
-    const dayBusy = busy.filter(
-      (interval) =>
-        interval.start < windowEnd.getTime() &&
-        interval.end > windowStart.getTime(),
-    );
-
-    for (const interval of dayBusy) {
-      const gapEnd = Math.min(interval.start, windowEnd.getTime());
-      if (gapEnd - cursor >= minMs) {
-        slots.push({
-          start: new Date(cursor).toISOString(),
-          end: new Date(gapEnd).toISOString(),
-        });
-      }
-      cursor = Math.max(cursor, interval.end);
-    }
-
-    if (windowEnd.getTime() - cursor >= minMs) {
-      slots.push({
-        start: new Date(cursor).toISOString(),
-        end: new Date(
-          Math.min(windowEnd.getTime(), rangeEnd.getTime()),
-        ).toISOString(),
-      });
-    }
-
-    day.setDate(day.getDate() + 1);
-  }
-
-  return slots.filter(
-    (slot) => new Date(slot.end).getTime() > new Date(slot.start).getTime(),
-  );
+  return buildAvailabilitySlots({
+    busy: busy.map((interval) => ({
+      start: new Date(interval.start).toISOString(),
+      end: new Date(interval.end).toISOString(),
+    })),
+    timeMin,
+    timeMax,
+    timeZone: timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
+    minMinutes,
+    dayStartHour,
+    dayEndHour,
+  });
 }
 
 async function findFollowUpCandidates(userId: string, limit: number) {

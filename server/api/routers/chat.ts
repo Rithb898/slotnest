@@ -23,6 +23,7 @@ import {
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { corsairReadonly } from "@/server/corsair";
 import { db } from "@/server/db";
+import { reserveAndRunAgentCall } from "@/server/billing/budgeted-agent-call";
 import {
   chatConversation,
   chatMessage,
@@ -191,7 +192,15 @@ ${styleBlock}
 
 Write the final reply body now.`;
 
-  const result = await run(agent, withCurrentTimeContext(prompt));
+  const result = await reserveAndRunAgentCall({
+    db,
+    userId,
+    actionKind: "chat.voiceRewrite",
+    source: "server/api/routers/chat.ts:draftReplyInVoice",
+    model: VOICE_MODEL,
+    agent,
+    input: withCurrentTimeContext(prompt),
+  });
   return cleanBody(result.finalOutput ?? "") || proposal.body;
 }
 
@@ -465,7 +474,15 @@ export const chatRouter = createTRPCRouter({
       const agentInput = transcript
         ? `Conversation so far:\n${transcript}\n\nUser: ${input.prompt}`
         : input.prompt;
-      const result = await run(agent, withCurrentTimeContext(agentInput));
+      const result = await reserveAndRunAgentCall({
+        db: ctx.db,
+        userId,
+        actionKind: "chat.send",
+        source: "server/api/routers/chat.ts:send",
+        model: CHAT_MODEL,
+        agent,
+        input: withCurrentTimeContext(agentInput),
+      });
       const output = result.finalOutput ?? {
         text: "(no response)",
         proposals: [],

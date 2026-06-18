@@ -333,6 +333,32 @@ async function getLiveInboxMessages({
   };
 }
 
+export const INBOX_CACHE_PAGE_TOKEN_PREFIX = "cache:";
+
+export function decodeInboxCachePageToken(pageToken?: string) {
+  if (!pageToken?.startsWith(INBOX_CACHE_PAGE_TOKEN_PREFIX)) {
+    return null;
+  }
+
+  const offset = Number(pageToken.slice(INBOX_CACHE_PAGE_TOKEN_PREFIX.length));
+  return Number.isFinite(offset) && offset > 0 ? offset : 0;
+}
+
+export function encodeInboxCachePageToken(offset: number) {
+  return `${INBOX_CACHE_PAGE_TOKEN_PREFIX}${Math.max(0, offset)}`;
+}
+
+export function shouldUseCachedInboxPage({
+  cachedMessageCount,
+  pageToken,
+}: {
+  cachedMessageCount: number;
+  pageToken?: string;
+}) {
+  return decodeInboxCachePageToken(pageToken) !== null
+    || (!pageToken && cachedMessageCount > 0);
+}
+
 async function getCachedInboxMessages({
   tenant,
   q,
@@ -344,8 +370,7 @@ async function getCachedInboxMessages({
   maxResults: number;
   pageToken?: string;
 }) {
-  const offset = pageToken ? Number(pageToken) : 0;
-  const normalizedOffset = Number.isFinite(offset) && offset > 0 ? offset : 0;
+  const normalizedOffset = decodeInboxCachePageToken(pageToken) ?? 0;
   const rows = await tenant.gmail.db.messages.list({
     limit: Math.max(250, maxResults + normalizedOffset + 1),
     offset: 0,
@@ -361,7 +386,8 @@ async function getCachedInboxMessages({
   const nextOffset = normalizedOffset + maxResults;
   return {
     messages: page,
-    nextPageToken: filtered.length > nextOffset ? String(nextOffset) : null,
+    nextPageToken:
+      filtered.length > nextOffset ? encodeInboxCachePageToken(nextOffset) : null,
   };
 }
 
@@ -1046,6 +1072,7 @@ export const gmailRouter = createTRPCRouter({
 
       const tenant = corsair.withTenant(ctx.session.user.id);
       const maxResults = input?.maxResults ?? 25;
+      const cachePageToken = decodeInboxCachePageToken(input?.pageToken);
 
       const cached = input?.forceFresh
         ? { messages: [], nextPageToken: null }
@@ -1056,10 +1083,12 @@ export const gmailRouter = createTRPCRouter({
             pageToken: input?.pageToken,
           });
 
-      const source =
-        cached.messages.length > 0 || input?.pageToken
-          ? cached
-          : await getLiveInboxMessages({
+      const source = shouldUseCachedInboxPage({
+        cachedMessageCount: cached.messages.length,
+        pageToken: input?.pageToken,
+      })
+        ? cached
+        : await getLiveInboxMessages({
               tenant,
               q: input?.q,
               maxResults,

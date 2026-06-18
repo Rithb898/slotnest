@@ -2,6 +2,8 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
+import { shouldUseCachedCalendarEvents } from "@/lib/calendar-freshness";
+import { buildAvailabilitySlots } from "@/lib/calendar-availability";
 import { corsair } from "@/server/corsair";
 import { db } from "@/server/db";
 import { corsairAccounts, corsairIntegrations } from "@/server/db/schema";
@@ -20,9 +22,6 @@ import { corsairAccounts, corsairIntegrations } from "@/server/db/schema";
  * (same source as `connections.list`) and return `{ connected: false }`.
  */
 
-/** A free-busy interval as returned by `getAvailability`. */
-type BusyInterval = { start: string; end: string };
-
 type CachedCalendarEvent = {
   id?: string;
   status?: "tentative" | "confirmed" | "cancelled";
@@ -33,6 +32,12 @@ type CachedCalendarEvent = {
   end?: { date?: string; dateTime?: string; timeZone?: string };
   attendees?: { email?: string }[];
   calendarId?: string;
+};
+
+type CachedCalendarRow = {
+  entity_id: string;
+  createdAt?: string | Date | null;
+  data: CachedCalendarEvent;
 };
 
 /** Returns true if the signed-in tenant has a googlecalendar account. */
@@ -121,12 +126,12 @@ async function getCachedEvents({
   timeMax: string;
   maxResults: number;
 }) {
-  const rows = await tenant.googlecalendar.db.events.list({
+  const rows = (await tenant.googlecalendar.db.events.list({
     limit: Math.max(250, maxResults),
     offset: 0,
-  });
+  })) as CachedCalendarRow[];
 
-  return rows
+  const events = rows
     .map((row) => normalizeCalendarEvent(row.data, row.entity_id))
     .filter((event) => event.status !== "cancelled")
     .filter((event) => !event.calendarId || event.calendarId === "primary")
@@ -136,6 +141,8 @@ async function getCachedEvents({
         new Date(a.start ?? 0).getTime() - new Date(b.start ?? 0).getTime(),
     )
     .slice(0, maxResults);
+
+  return { rows, events };
 }
 
 export const calendarRouter = createTRPCRouter({
@@ -168,22 +175,30 @@ export const calendarRouter = createTRPCRouter({
       const timeMin = input?.timeMin ?? now.toISOString();
       const timeMax = input?.timeMax ?? weekOut.toISOString();
       const maxResults = input?.maxResults ?? 100;
-
       const cached = input?.forceFresh
-        ? []
+        ? { rows: [] as CachedCalendarRow[], events: [] }
         : await getCachedEvents({ tenant, timeMin, timeMax, maxResults });
-      const events =
-        cached.length > 0
-          ? cached
-          : await getLiveEvents({
-              tenant,
-              timeMin,
-              timeMax,
-              timeZone: input?.timeZone,
-              maxResults,
-            });
+      const useCached =
+        !input?.forceFresh &&
+        shouldUseCachedCalendarEvents(cached.rows, now);
+      if (useCached) {
+        return { connected: true as const, events: cached.events };
+      }
 
-      return { connected: true as const, events };
+      try {
+        return {
+          connected: true as const,
+          events: await getLiveEvents({
+            tenant,
+            timeMin,
+            timeMax,
+            timeZone: input?.timeZone,
+            maxResults,
+          }),
+        };
+      } catch {
+        return { connected: true as const, events: cached.events };
+      }
     }),
 
   /**
@@ -229,7 +244,7 @@ export const calendarRouter = createTRPCRouter({
       // `busy: {start,end}[]` array. Collect every busy interval.
       const calendars = (res.calendars ?? {}) as Record<
         string,
-        { busy?: BusyInterval[] }
+        { busy?: { start: string; end: string }[] }
       >;
       const busy: { start: number; end: number }[] = [];
       for (const cal of Object.values(calendars)) {
@@ -243,50 +258,20 @@ export const calendarRouter = createTRPCRouter({
       }
       busy.sort((a, b) => a.start - b.start);
 
-      // Invert busy intervals into free slots, per day, within the work window.
-      const slots: { start: string; end: string }[] = [];
-      const rangeStart = new Date(timeMin);
-      const rangeEnd = new Date(timeMax);
-      const minMs = minMinutes * 60 * 1000;
-
-      const day = new Date(
-        rangeStart.getFullYear(),
-        rangeStart.getMonth(),
-        rangeStart.getDate(),
-      );
-      while (day <= rangeEnd) {
-        const windowStart = new Date(day);
-        windowStart.setHours(dayStartHour, 0, 0, 0);
-        const windowEnd = new Date(day);
-        windowEnd.setHours(dayEndHour, 0, 0, 0);
-
-        // Clamp the day's window to the overall range and to "now".
-        let cursor = Math.max(
-          windowStart.getTime(),
-          rangeStart.getTime(),
-          now.getTime(),
-        );
-        const dayEnd = Math.min(windowEnd.getTime(), rangeEnd.getTime());
-
-        for (const b of busy) {
-          if (b.end <= cursor || b.start >= dayEnd) continue;
-          if (b.start > cursor && b.start - cursor >= minMs) {
-            slots.push({
-              start: new Date(cursor).toISOString(),
-              end: new Date(b.start).toISOString(),
-            });
-          }
-          cursor = Math.max(cursor, b.end);
-        }
-        if (dayEnd - cursor >= minMs) {
-          slots.push({
-            start: new Date(cursor).toISOString(),
-            end: new Date(dayEnd).toISOString(),
-          });
-        }
-
-        day.setDate(day.getDate() + 1);
-      }
+      const slots = buildAvailabilitySlots({
+        busy: busy.map((interval) => ({
+          start: new Date(interval.start).toISOString(),
+          end: new Date(interval.end).toISOString(),
+        })),
+        timeMin: new Date(
+          Math.max(new Date(timeMin).getTime(), now.getTime()),
+        ).toISOString(),
+        timeMax,
+        timeZone: input?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
+        minMinutes,
+        dayStartHour,
+        dayEndHour,
+      });
 
       return { connected: true as const, slots };
     }),
