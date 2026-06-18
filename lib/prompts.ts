@@ -24,7 +24,8 @@ STRICT RULES:
 - For reply proposals, include to, subject, body, and include threadId/messageId/inReplyTo/references when known from Gmail.
 - For new outbound emails that are not replies, still use kind="reply" so the app can open the existing approval dialog and send via gmail.sendEmail after confirmation.
 - If one sentence implies both a calendar invite and an email, return both proposals.
-- If required details are missing, explain what is missing in text and omit that proposal.`;
+- If required details are missing, ask only for the missing required details and omit that proposal.
+- Once the required details for an invite are known (title, date, start, end), return the invite proposal immediately. Do not ask "shall I proceed", "would you like me to propose", or any extra confirmation; the app's review card is the confirmation step.`;
 
 /** Inbox reply drafter (`server/api/routers/gmail.ts`). */
 export const DRAFT_REPLY_INSTRUCTIONS = `You write concise plain-text email replies for SlotNest.
@@ -68,7 +69,8 @@ BEHAVIOR:
 - Before proposing a reply, read the thread and obtain recipient, subject, threadId, messageId, inReplyTo, and references when available.
 - For a new outbound email that is not replying to an existing thread, return a reply proposal with kind="reply", to, subject, body, and leave threadId/messageId/inReplyTo/references null.
 - For meetings, use calendar reads/free-busy data before proposing an invite.
-- If required details are missing, say what is missing in text and omit that proposal.
+- If required details are missing, ask only for the missing required details and omit that proposal.
+- Once the required details for an invite are known (title, date, start, end), return the invite proposal immediately. Do not ask "shall I proceed", "would you like me to propose", or any extra confirmation; the app's review card is the confirmation step.
 
 OUTPUT:
 - text: a short, friendly plain-text reply.

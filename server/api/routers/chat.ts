@@ -103,6 +103,33 @@ function cleanBody(text: string): string {
     .trim();
 }
 
+function formatTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function formatDay(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+  }).format(date);
+}
+
+function approvalSuccessText(proposal: Proposal): string {
+  if (proposal.kind === "invite") {
+    return `Done. I created "${proposal.summary}" on ${formatDay(
+      proposal.start,
+    )} from ${formatTime(proposal.start)} to ${formatTime(proposal.end)}.`;
+  }
+  return `Done. I sent the reply to ${proposal.to}.`;
+}
+
 /** Render stored history into a transcript the agent reads as context. */
 function renderHistory(messages: ChatMessagePayload[]): string {
   return messages
@@ -317,6 +344,14 @@ export const chatRouter = createTRPCRouter({
         ChatMessagePayload,
         { type: "approval" }
       >["content"];
+      if (content.status === "sent") {
+        return {
+          updated: false as const,
+          content,
+          assistantMessage: null as ChatMessagePayload | null,
+        };
+      }
+
       const nextContent = {
         ...content,
         status: "sent" as const,
@@ -328,7 +363,22 @@ export const chatRouter = createTRPCRouter({
         .set({ content: nextContent })
         .where(eq(chatMessage.id, input.messageId));
 
-      return { updated: true as const, content: nextContent };
+      const assistantMessage = await insertMessage(message.conversationId, {
+        role: "assistant",
+        type: "text",
+        content: { text: approvalSuccessText(content.proposal) },
+      });
+
+      await db
+        .update(chatConversation)
+        .set({ updatedAt: new Date() })
+        .where(eq(chatConversation.id, message.conversationId));
+
+      return {
+        updated: true as const,
+        content: nextContent,
+        assistantMessage,
+      };
     }),
 
   send: protectedProcedure

@@ -19,10 +19,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/trpc/react";
 
 /**
- * Draft-then-approve invite composer (plan 003 step 5).
+ * Draft-then-approve event composer (plan 003 step 5).
  *
  * A single controlled dialog used by both /calendar and the /inbox "→ Invite"
- * action. It is a DRAFT until the user hits "Send invite" — only then does the
+ * action. It is a DRAFT until the user approves — only then does the
  * `calendar.createEvent` write fire. Nothing books without this explicit human
  * action. The primary button uses the neutral `secondary` variant, not honey:
  * the One Light Rule reserves honey for the active nav rail on this screen.
@@ -36,6 +36,12 @@ export type InviteDraft = {
   end?: string;
   attendees?: string[];
   description?: string;
+};
+
+type CreatedEvent = {
+  id: string | null;
+  htmlLink: string | null;
+  summary: string;
 };
 
 /** Format an ISO string into the value a <input type="datetime-local"> wants. */
@@ -65,7 +71,7 @@ export function InviteDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   draft: InviteDraft | null;
-  onSent?: () => void;
+  onSent?: (event: CreatedEvent) => void;
 }) {
   const utils = api.useUtils();
   const [summary, setSummary] = useState("");
@@ -91,8 +97,9 @@ export function InviteDialog({
 
   const createEvent = api.calendar.createEvent.useMutation({
     onSuccess: (res) => {
-      toast.success("Invite sent", {
-        description: res.htmlLink ? "Added to your calendar." : undefined,
+      const hasAttendees = attendeeList.length > 0;
+      toast.success(hasAttendees ? "Invite sent" : "Event created", {
+        description: "Added to your calendar.",
         action: res.htmlLink
           ? {
               label: "Open",
@@ -102,11 +109,11 @@ export function InviteDialog({
       });
       void utils.calendar.events.invalidate();
       void utils.calendar.availability.invalidate();
-      onSent?.();
+      onSent?.(res);
       onOpenChange(false);
     },
     onError: (err) => {
-      toast.error("Couldn't send invite", { description: err.message });
+      toast.error("Couldn't create event", { description: err.message });
     },
   });
 
@@ -116,6 +123,8 @@ export function InviteDialog({
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+  const hasAttendees = attendeeList.length > 0;
+  const showAttendees = Boolean(draft?.attendees?.length) || hasAttendees;
 
   const startIso = fromLocalInput(start);
   const endIso = fromLocalInput(end);
@@ -143,10 +152,10 @@ export function InviteDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CalendarPlus className="size-4 text-muted-foreground" />
-            Draft invite
+            {hasAttendees ? "Review invite" : "Review event"}
           </DialogTitle>
           <DialogDescription>
-            Review the details. Nothing is sent until you approve.
+            Nothing is added to your calendar until you approve.
           </DialogDescription>
         </DialogHeader>
 
@@ -182,15 +191,17 @@ export function InviteDialog({
             </div>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="invite-attendees">Attendees</Label>
-            <Input
-              id="invite-attendees"
-              value={attendees}
-              onChange={(e) => setAttendees(e.target.value)}
-              placeholder="name@example.com, other@example.com"
-            />
-          </div>
+          {showAttendees ? (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="invite-attendees">Attendees</Label>
+              <Input
+                id="invite-attendees"
+                value={attendees}
+                onChange={(e) => setAttendees(e.target.value)}
+                placeholder="name@example.com, other@example.com"
+              />
+            </div>
+          ) : null}
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="invite-description">Note</Label>
@@ -199,7 +210,11 @@ export function InviteDialog({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
-              placeholder="Optional message to attendees"
+              placeholder={
+                hasAttendees
+                  ? "Optional message to attendees"
+                  : "Optional event note"
+              }
             />
           </div>
         </div>
@@ -218,11 +233,15 @@ export function InviteDialog({
             disabled={!valid || createEvent.isPending}
           >
             {createEvent.isPending ? (
-              "Sending…"
+              hasAttendees ? (
+                "Sending..."
+              ) : (
+                "Creating..."
+              )
             ) : (
               <>
                 <ExternalLink className="size-4" />
-                Send invite
+                {hasAttendees ? "Send invite" : "Create event"}
               </>
             )}
           </Button>

@@ -211,6 +211,7 @@ export function ChatClient() {
     const proposal = message.content.proposal;
     if (message.content.status === "sent") return;
     if (proposal.kind === "invite") {
+      setActiveApprovalId(message.id);
       setInviteDraft({
         summary: proposal.summary,
         start: proposal.start,
@@ -249,7 +250,25 @@ export function ChatClient() {
         };
       }),
     );
-    markApprovalSent.mutate({ messageId });
+    markApprovalSent.mutate(
+      { messageId },
+      {
+        onSuccess: (res) => {
+          const assistantMessage = res.assistantMessage;
+          if (!assistantMessage) return;
+          setMessages((prev) =>
+            prev.some((message) => message.id === assistantMessage.id)
+              ? prev
+              : [...prev, assistantMessage],
+          );
+        },
+        onError: (err) => {
+          toast.error("Couldn't save approval state", {
+            description: err.message,
+          });
+        },
+      },
+    );
     setActiveApprovalId(null);
   }
 
@@ -536,6 +555,7 @@ export function ChatClient() {
         open={inviteOpen}
         onOpenChange={setInviteOpen}
         draft={inviteDraft}
+        onSent={markActiveApprovalSent}
       />
       <ReplyDialog
         open={replyOpen}
@@ -774,6 +794,11 @@ function MessageRow({
                 {proposal.attendees.length > 0 ? (
                   <p className="truncate">{proposal.attendees.join(", ")}</p>
                 ) : null}
+                {sent ? (
+                  <p className="text-xs font-medium text-success">
+                    Added to Calendar.
+                  </p>
+                ) : null}
               </div>
             ) : (
               <div className="space-y-2 text-sm">
@@ -806,7 +831,11 @@ function MessageRow({
             ) : (
               <Send className="size-4" />
             )}
-            {sent ? "Sent" : "Review"}
+            {sent
+              ? proposal.kind === "invite"
+                ? "Created"
+                : "Sent"
+              : "Review"}
           </Button>
         </div>
       </div>
