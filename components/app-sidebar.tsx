@@ -50,7 +50,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarSeparator,
-  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useIsMac } from "@/hooks/use-is-mac";
@@ -156,6 +155,7 @@ export function AppSidebar() {
     ...CALENDAR_POLL_OPTIONS,
     enabled: !!todayRange && calendarConnected,
   });
+  const { state } = useSidebar();
 
   const needsYou =
     inbox.data?.messages.filter(
@@ -175,11 +175,11 @@ export function AppSidebar() {
     : 0;
 
   const health = connectionHealth(connections.data);
-  const { state } = useSidebar();
   const plan = billing.data?.currentPlan ?? null;
   const aiBudget = billing.data?.aiActionBudget ?? null;
 
   function trailingFor(href: string): React.ReactNode {
+    if (state === "collapsed") return null;
     if (href === "/today")
       return <CountBadge count={needsYou} urgent={hasUrgent} />;
     if (href === "/inbox")
@@ -209,42 +209,48 @@ export function AppSidebar() {
           <Link
             href="/today"
             aria-label="SlotNest home"
-            className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full"
+            className="flex min-w-0 items-center gap-2"
           >
-            <SlotNestMark className="size-full rounded-full object-cover" />
+            <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full">
+              <SlotNestMark className="size-full rounded-full object-cover" />
+            </span>
+            {state !== "collapsed" ? (
+              <span className="truncate text-sm font-semibold tracking-tight text-foreground">
+                SlotNest
+              </span>
+            ) : null}
           </Link>
-          <div className="ml-auto flex items-center gap-1">
-            <SidebarTrigger />
-          </div>
         </div>
 
-        <div className="px-2 pb-1">
-          <InputGroup
-            className="h-9 cursor-pointer"
-            onClick={() => setOpen(true)}
-          >
-            <InputGroupAddon>
-              <Search />
-            </InputGroupAddon>
-            <InputGroupInput
-              readOnly
-              placeholder="Ask or search…"
-              aria-label="Open command bar"
-              className="cursor-pointer"
-              onMouseDown={(e) => e.preventDefault()}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  setOpen(true);
-                }
-              }}
-            />
-            <InputGroupAddon align="inline-end">
-              <Kbd>{isMac ? "⌘" : "Ctrl"}</Kbd>
-              <Kbd>K</Kbd>
-            </InputGroupAddon>
-          </InputGroup>
-        </div>
+        {state !== "collapsed" ? (
+          <div className="px-2 pb-1">
+            <InputGroup
+              className="h-9 cursor-pointer"
+              onClick={() => setOpen(true)}
+            >
+              <InputGroupAddon>
+                <Search />
+              </InputGroupAddon>
+              <InputGroupInput
+                readOnly
+                placeholder="Ask or search…"
+                aria-label="Open command bar"
+                className="cursor-pointer"
+                onMouseDown={(e) => e.preventDefault()}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setOpen(true);
+                  }
+                }}
+              />
+              <InputGroupAddon align="inline-end">
+                <Kbd>{isMac ? "⌘" : "Ctrl"}</Kbd>
+                <Kbd>K</Kbd>
+              </InputGroupAddon>
+            </InputGroup>
+          </div>
+        ) : null}
       </SidebarHeader>
 
       <SidebarContent>
@@ -310,50 +316,50 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
-        <div className="px-2 pb-2">
-          <div className="rounded-2xl border border-sidebar-border bg-sidebar-accent/40 px-3 py-2">
-            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
-              Plan
-            </div>
-            <div className="mt-1 flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <div className="truncate text-sm font-medium leading-tight">
-                  {plan?.label ?? "Free"}
-                </div>
-                {state !== "collapsed" ? (
+        {state !== "collapsed" ? (
+          <div className="px-2 pb-2">
+            <div className="rounded-2xl border border-sidebar-border bg-sidebar-accent/40 px-3 py-2">
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                Plan
+              </div>
+              <div className="mt-1 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium leading-tight">
+                    {plan?.label ?? "Free"}
+                  </div>
                   <div className="truncate text-xs text-muted-foreground">
                     {plan?.description ??
                       "Core SlotNest access for personal use."}
                   </div>
-                ) : null}
-                {state !== "collapsed" && aiBudget ? (
-                  <div
-                    className={cn(
-                      "mt-2 text-xs",
-                      aiBudget.exhausted
-                        ? "text-destructive"
-                        : "text-muted-foreground",
-                    )}
-                  >
-                    <div>
-                      {aiBudget.exhausted
-                        ? "AI budget exhausted"
-                        : `${aiBudget.remaining} of ${aiBudget.limit} AI actions left`}
+                  {aiBudget ? (
+                    <div
+                      className={cn(
+                        "mt-2 text-xs",
+                        aiBudget.exhausted
+                          ? "text-destructive"
+                          : "text-muted-foreground",
+                      )}
+                    >
+                      <div>
+                        {aiBudget.exhausted
+                          ? "AI budget exhausted"
+                          : `${aiBudget.remaining} of ${aiBudget.limit} AI actions left`}
+                      </div>
+                      <div>Resets {formatBudgetReset(aiBudget.resetAt)}</div>
                     </div>
-                    <div>Resets {formatBudgetReset(aiBudget.resetAt)}</div>
-                  </div>
-                ) : null}
+                  ) : null}
+                </div>
               </div>
+              {plan?.name !== "pro" ? (
+                <BillingUpgradeButton
+                  label="Upgrade now"
+                  size="sm"
+                  className="mt-3 w-full"
+                />
+              ) : null}
             </div>
-            {state !== "collapsed" && plan?.name !== "pro" ? (
-              <BillingUpgradeButton
-                label="Upgrade now"
-                size="sm"
-                className="mt-3 w-full"
-              />
-            ) : null}
           </div>
-        </div>
+        ) : null}
         <AccountMenu health={health} />
       </SidebarFooter>
     </Sidebar>

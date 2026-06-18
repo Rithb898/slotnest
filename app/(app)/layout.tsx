@@ -3,7 +3,7 @@ import { Suspense } from "react";
 
 import { AppSidebar } from "@/components/app-sidebar";
 import { CommandBar } from "@/components/command-bar";
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { getSession } from "@/server/auth/server";
 
 /**
@@ -26,6 +26,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <CommandBar>
         <div className="flex h-svh w-full overflow-hidden">
           <AppSidebar />
+          <div className="flex shrink-0 items-start pt-3 pl-3">
+            <SidebarTrigger />
+          </div>
           {/* data-lenis-prevent: the app shell scrolls inside this <main>, not the
            * window — without it the root Lenis instance swallows wheel events and
            * the page can't scroll. */}
