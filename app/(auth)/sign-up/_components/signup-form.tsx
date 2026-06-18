@@ -1,6 +1,7 @@
 "use client";
 import { useForm } from "@tanstack/react-form";
 import { Eye, EyeOff } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -14,14 +15,18 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Field,
+  FieldContent,
   FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
+  FieldSeparator,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { authClient } from "@/server/auth/client";
 
@@ -40,12 +45,25 @@ const formSchema = z
     path: ["confirmPassword"],
   });
 
+const signUpWithGoogle = async () => {
+  await authClient.signIn.social(
+    { provider: "google", callbackURL: "/today" },
+    {
+      onError: (ctx) => {
+        toast.error(ctx.error.message);
+      },
+    },
+  );
+};
+
 export function SignupForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
   const router = useRouter();
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [termsError, setTermsError] = useState<string | null>(null);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -61,6 +79,10 @@ export function SignupForm({
     },
     onSubmit: async ({ value }) => {
       setPasswordError(null);
+      if (!acceptedTerms) {
+        setTermsError("You must accept the Terms and Privacy Policy.");
+        return;
+      }
       await authClient.signUp.email(
         {
           name: value.name,
@@ -91,7 +113,7 @@ export function SignupForm({
         <CardHeader className="text-center">
           <CardTitle className="text-xl">Create your account</CardTitle>
           <CardDescription>
-            Enter your email below to create your account
+            Continue with Google or enter your details below
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -103,6 +125,33 @@ export function SignupForm({
             }}
           >
             <FieldGroup>
+              <Field>
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={() => {
+                    if (!acceptedTerms) {
+                      setTermsError(
+                        "You must accept the Terms and Privacy Policy.",
+                      );
+                      return;
+                    }
+                    void signUpWithGoogle();
+                  }}
+                >
+                  <Image
+                    src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/google/google-original.svg"
+                    alt="Google"
+                    width={16}
+                    height={16}
+                    className="mr-2"
+                  />
+                  Continue with Google
+                </Button>
+              </Field>
+              <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">
+                Or continue with
+              </FieldSeparator>
               <form.Field name="name">
                 {(field) => (
                   <Field>
@@ -234,6 +283,32 @@ export function SignupForm({
                   Must be at least 8 characters long.
                 </FieldDescription>
               </Field>
+              <Field orientation="horizontal" className="items-start gap-3">
+                <Checkbox
+                  id="accept-terms"
+                  className="mt-1"
+                  checked={acceptedTerms}
+                  onCheckedChange={(checked) => {
+                    const nextValue = checked === true;
+                    setAcceptedTerms(nextValue);
+                    if (nextValue) {
+                      setTermsError(null);
+                    }
+                  }}
+                  aria-invalid={termsError ? true : undefined}
+                />
+                <FieldContent>
+                  <Label
+                    htmlFor="accept-terms"
+                    className="block text-sm leading-6 font-normal"
+                  >
+                    I agree to the{" "}
+                    <Link href="/terms-of-service">Terms of Service</Link> and{" "}
+                    <Link href="/privacy-policy">Privacy Policy</Link>.
+                  </Label>
+                  {termsError && <FieldError>{termsError}</FieldError>}
+                </FieldContent>
+              </Field>
               <Field>
                 <form.Subscribe selector={(s) => s.isSubmitting}>
                   {(isSubmitting) => (
@@ -250,11 +325,6 @@ export function SignupForm({
           </form>
         </CardContent>
       </Card>
-      <FieldDescription className="px-6 text-center">
-        By clicking continue, you agree to our{" "}
-        <Link href="/terms-of-service">Terms of Service</Link> and{" "}
-        <Link href="/privacy-policy">Privacy Policy</Link>.
-      </FieldDescription>
     </div>
   );
 }
