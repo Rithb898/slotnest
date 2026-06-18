@@ -70,7 +70,8 @@ export async function requestPasswordReset(formData: FormData) {
     });
   } catch (error) {
     return {
-      error: error instanceof APIError ? error.message : "Password reset failed",
+      error:
+        error instanceof APIError ? error.message : "Password reset failed",
     };
   }
 
@@ -94,7 +95,8 @@ export async function resetPassword(formData: FormData) {
     });
   } catch (error) {
     return {
-      error: error instanceof APIError ? error.message : "Password reset failed",
+      error:
+        error instanceof APIError ? error.message : "Password reset failed",
     };
   }
 

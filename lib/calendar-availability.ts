@@ -49,10 +49,7 @@ function getOffsetMinutes(date: Date, timeZone: string): number {
   return sign * (hours * 60 + minutes);
 }
 
-function zonedDateTimeToUtc(
-  value: TimeZoneDateTime,
-  timeZone: string,
-): Date {
+function zonedDateTimeToUtc(value: TimeZoneDateTime, timeZone: string): Date {
   const localUtcGuess = new Date(
     Date.UTC(
       value.year,
@@ -70,10 +67,7 @@ function zonedDateTimeToUtc(
   return new Date(localUtcGuess.getTime() - offsetMinutes * 60 * 1000);
 }
 
-function addLocalDays(
-  value: LocalDateParts,
-  days: number,
-): LocalDateParts {
+function addLocalDays(value: LocalDateParts, days: number): LocalDateParts {
   const utc = new Date(Date.UTC(value.year, value.month - 1, value.day));
   utc.setUTCDate(utc.getUTCDate() + days);
   return {
@@ -101,7 +95,12 @@ function normalizeBusyIntervals(busy: BusyInterval[]) {
       start: new Date(interval.start).getTime(),
       end: new Date(interval.end).getTime(),
     }))
-    .filter((interval) => Number.isFinite(interval.start) && Number.isFinite(interval.end) && interval.end > interval.start)
+    .filter(
+      (interval) =>
+        Number.isFinite(interval.start) &&
+        Number.isFinite(interval.end) &&
+        interval.end > interval.start,
+    )
     .sort((a, b) => a.start - b.start);
 }
 

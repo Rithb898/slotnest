@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 
 process.env.NODE_ENV ||= "test";
-process.env.DATABASE_URL ||= "postgres://postgres:postgres@localhost:5432/postgres";
+process.env.DATABASE_URL ||=
+  "postgres://postgres:postgres@localhost:5432/postgres";
 process.env.CORSAIR_KEK ||= "test-kek";
 process.env.BETTER_AUTH_SECRET ||= "test-better-auth-secret";
 process.env.BETTER_AUTH_URL ||= "https://slotnest.test";

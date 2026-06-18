@@ -73,8 +73,7 @@ async function main() {
       },
     }),
     (error: unknown) => {
-      exhaustedMessage =
-        error instanceof Error ? error.message : String(error);
+      exhaustedMessage = error instanceof Error ? error.message : String(error);
       return exhaustedMessage.includes("AI action budget exhausted");
     },
   );

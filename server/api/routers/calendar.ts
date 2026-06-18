@@ -179,8 +179,7 @@ export const calendarRouter = createTRPCRouter({
         ? { rows: [] as CachedCalendarRow[], events: [] }
         : await getCachedEvents({ tenant, timeMin, timeMax, maxResults });
       const useCached =
-        !input?.forceFresh &&
-        shouldUseCachedCalendarEvents(cached.rows, now);
+        !input?.forceFresh && shouldUseCachedCalendarEvents(cached.rows, now);
       if (useCached) {
         return { connected: true as const, events: cached.events };
       }
@@ -267,7 +266,8 @@ export const calendarRouter = createTRPCRouter({
           Math.max(new Date(timeMin).getTime(), now.getTime()),
         ).toISOString(),
         timeMax,
-        timeZone: input?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
+        timeZone:
+          input?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
         minMinutes,
         dayStartHour,
         dayEndHour,

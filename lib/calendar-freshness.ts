@@ -10,7 +10,10 @@ function toTimestamp(value: string | Date | null | undefined): number {
   return Number.isFinite(time) ? time : Number.NaN;
 }
 
-export function getCalendarCacheAgeMs(rows: CalendarCacheRow[], now = new Date()) {
+export function getCalendarCacheAgeMs(
+  rows: CalendarCacheRow[],
+  now = new Date(),
+) {
   const latest = rows
     .map((row) => toTimestamp(row.createdAt))
     .filter(Number.isFinite)
@@ -28,7 +31,10 @@ export function getCalendarCacheAgeMs(rows: CalendarCacheRow[], now = new Date()
  * synced recently enough to still be a good approximation of the live window.
  * Otherwise fall back to live reads so newly created or moved events show up.
  */
-export function shouldUseCachedCalendarEvents(rows: CalendarCacheRow[], now = new Date()) {
+export function shouldUseCachedCalendarEvents(
+  rows: CalendarCacheRow[],
+  now = new Date(),
+) {
   return getCalendarCacheAgeMs(rows, now) <= CALENDAR_CACHE_MAX_AGE_MS;
 }
 

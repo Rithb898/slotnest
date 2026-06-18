@@ -355,8 +355,10 @@ export function shouldUseCachedInboxPage({
   cachedMessageCount: number;
   pageToken?: string;
 }) {
-  return decodeInboxCachePageToken(pageToken) !== null
-    || (!pageToken && cachedMessageCount > 0);
+  return (
+    decodeInboxCachePageToken(pageToken) !== null ||
+    (!pageToken && cachedMessageCount > 0)
+  );
 }
 
 async function getCachedInboxMessages({
@@ -387,7 +389,9 @@ async function getCachedInboxMessages({
   return {
     messages: page,
     nextPageToken:
-      filtered.length > nextOffset ? encodeInboxCachePageToken(nextOffset) : null,
+      filtered.length > nextOffset
+        ? encodeInboxCachePageToken(nextOffset)
+        : null,
   };
 }
 
@@ -1089,11 +1093,11 @@ export const gmailRouter = createTRPCRouter({
       })
         ? cached
         : await getLiveInboxMessages({
-              tenant,
-              q: input?.q,
-              maxResults,
-              pageToken: input?.pageToken,
-            });
+            tenant,
+            q: input?.q,
+            maxResults,
+            pageToken: input?.pageToken,
+          });
       let visibleSourceMessages = source.messages;
       try {
         visibleSourceMessages = filterMessagesByApprovalState(
