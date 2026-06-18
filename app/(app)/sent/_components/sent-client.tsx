@@ -1,26 +1,60 @@
 "use client";
 
 import { Inbox, MailCheck, RefreshCw, SendHorizontal } from "lucide-react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { api } from "@/trpc/react";
 
 export function SentClient() {
+  const pageSize = 10;
+  const [pageTokens, setPageTokens] = useState<Array<string | undefined>>([
+    undefined,
+  ]);
   const connections = api.connections.list.useQuery();
   const gmailConnected = connections.data?.includes("gmail") ?? false;
+  const pageToken = pageTokens[pageTokens.length - 1];
   const sent = api.gmail.sent.useQuery(
-    { maxResults: 50, forceFresh: true },
+    { maxResults: pageSize, pageToken, forceFresh: true },
     { enabled: gmailConnected },
   );
 
   const messages = sent.data?.messages ?? [];
   const isLoading = connections.isPending || sent.isLoading;
+  const nextPageToken = sent.data?.nextPageToken;
+  const hasNextPage = Boolean(nextPageToken);
+  const canGoBack = pageTokens.length > 1;
 
   function refresh() {
     void sent.refetch();
   }
+
+  function goNext() {
+    if (!nextPageToken) return;
+    setPageTokens((tokens) => [...tokens, nextPageToken]);
+  }
+
+  function goPrevious() {
+    setPageTokens((tokens) =>
+      tokens.length > 1 ? tokens.slice(0, -1) : tokens,
+    );
+  }
+
+  const pageSummary =
+    messages.length === 0
+      ? "No messages"
+      : messages.length === 1
+        ? "1 message on this page"
+        : `${messages.length} messages on this page`;
 
   return (
     <div className="min-h-full bg-background pb-16 md:pb-0">
@@ -34,7 +68,7 @@ export function SentClient() {
           </div>
           <div className="flex items-center gap-2">
             <div className="rounded-lg bg-muted px-3 py-2 text-sm font-medium">
-              {messages.length} sent
+              {pageSummary}
             </div>
             <Button
               variant="outline"
@@ -65,34 +99,74 @@ export function SentClient() {
           ) : messages.length === 0 ? (
             <EmptyState icon={MailCheck}>No sent emails found.</EmptyState>
           ) : (
-            <ul className="divide-y divide-border">
-              {messages.map((message) => (
-                <li key={message.id} className="px-4 py-4">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1">
-                          To {message.to || "unknown recipient"}
-                        </span>
-                        <span className="rounded-md bg-muted px-2 py-1">
-                          {formatDate(message.date)}
-                        </span>
+            <>
+              <ul className="divide-y divide-border">
+                {messages.map((message) => (
+                  <li key={message.id} className="px-4 py-4">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                          <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1">
+                            To {message.to || "unknown recipient"}
+                          </span>
+                          <span className="rounded-md bg-muted px-2 py-1">
+                            {formatDate(message.date)}
+                          </span>
+                        </div>
+                        <h2 className="mt-2 truncate text-base font-semibold">
+                          {message.subject}
+                        </h2>
+                        <p className="mt-1 line-clamp-2 max-w-4xl text-sm leading-6 text-muted-foreground">
+                          {message.snippet || "No preview available."}
+                        </p>
                       </div>
-                      <h2 className="mt-2 truncate text-base font-semibold">
-                        {message.subject}
-                      </h2>
-                      <p className="mt-1 line-clamp-2 max-w-4xl text-sm leading-6 text-muted-foreground">
-                        {message.snippet || "No preview available."}
-                      </p>
+                      <div className="flex shrink-0 items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
+                        <MailCheck className="size-3.5" />
+                        Sent
+                      </div>
                     </div>
-                    <div className="flex shrink-0 items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
-                      <MailCheck className="size-3.5" />
-                      Sent
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                  </li>
+                ))}
+              </ul>
+              <div className="border-t border-border px-4 py-4">
+                <Pagination className="mx-0 justify-end">
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        href="#"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          goPrevious();
+                        }}
+                        aria-disabled={!canGoBack}
+                        tabIndex={canGoBack ? 0 : -1}
+                        className={
+                          !canGoBack
+                            ? "pointer-events-none opacity-50"
+                            : undefined
+                        }
+                      />
+                    </PaginationItem>
+                    <PaginationItem>
+                      <PaginationNext
+                        href="#"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          goNext();
+                        }}
+                        aria-disabled={!hasNextPage}
+                        tabIndex={hasNextPage ? 0 : -1}
+                        className={
+                          !hasNextPage
+                            ? "pointer-events-none opacity-50"
+                            : undefined
+                        }
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            </>
           )}
         </section>
       </div>

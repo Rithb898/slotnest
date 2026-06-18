@@ -869,14 +869,21 @@ export const gmailRouter = createTRPCRouter({
           });
 
       const source =
-        cached.messages.length > 0 || input?.pageToken
-          ? cached
-          : await getLiveSentMessages({
+        input?.pageToken || input?.forceFresh
+          ? await getLiveSentMessages({
               tenant,
               q: input?.q,
               maxResults,
               pageToken: input?.pageToken,
-            });
+            })
+          : cached.messages.length > 0
+            ? cached
+            : await getLiveSentMessages({
+                tenant,
+                q: input?.q,
+                maxResults,
+                pageToken: input?.pageToken,
+              });
 
       return {
         connected: true as const,
