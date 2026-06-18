@@ -105,11 +105,11 @@ importers:
         specifier: ^3.4.9
         version: 3.4.9
       posthog-js:
-        specifier: ^1.390.2
-        version: 1.390.2
+        specifier: ^1.390.1
+        version: 1.390.1
       posthog-node:
-        specifier: ^5.38.1
-        version: 5.38.1
+        specifier: ^5.38.0
+        version: 5.38.0
       razorpay:
         specifier: ^2.9.6
         version: 2.9.6
@@ -4216,11 +4216,11 @@ packages:
     resolution: {integrity: sha512-GD3qdB0x1z9xgFI6cdRD6xu2Sp2WCOEoe3mtnyB5Ee0XrrL5Pe+e4CCnJrRMnL1zYtRDZmQQVbvOttLnKDLnaw==}
     engines: {node: '>=12'}
 
-  posthog-js@1.390.2:
-    resolution: {integrity: sha512-z1zh0mMokecCILXxabmo5Xag6uCVYEDhP2JnMYLNxwmKN7d7u1S94XYmhUTF3iyAo2JOg6c7n86mGaTXliz4MA==}
+  posthog-js@1.390.1:
+    resolution: {integrity: sha512-tcVbSBOFTsiz5//F4QFbqPNRRhW4LlUvv7jhW/L6IYil22VBeiaPDCmmTbQd9+w2nVW3NU2CDxdXklejYeLa/A==}
 
-  posthog-node@5.38.1:
-    resolution: {integrity: sha512-qjcy8pGrgcycDjUOHv8xOPBJ/5PdjqmeB3LhwDt428LEwMgjLWjUdK6n+g0mjSXhLD9WO6NKFMZH85z4ukKM+w==}
+  posthog-node@5.38.0:
+    resolution: {integrity: sha512-xEojUWq7ajYfsMPZIexG9xtvhewpqrPWvL/qRhnm8W3KVZi6BlXHe29tjywZJglrDwEQpqdtYKbRXyg2zF9MWw==}
     engines: {node: ^20.20.0 || >=22.22.0}
     peerDependencies:
       rxjs: ^7.0.0
@@ -8776,7 +8776,7 @@ snapshots:
 
   postgres@3.4.9: {}
 
-  posthog-js@1.390.2:
+  posthog-js@1.390.1:
     dependencies:
       '@posthog/core': 1.35.2
       '@posthog/types': 1.390.0
@@ -8787,7 +8787,7 @@ snapshots:
       query-selector-shadow-dom: 1.0.1
       web-vitals: 5.3.0
 
-  posthog-node@5.38.1:
+  posthog-node@5.38.0:
     dependencies:
       '@posthog/core': 1.35.2
 
