@@ -2,7 +2,8 @@ allowBuilds:
   esbuild: true
   sharp: true
   unrs-resolver: true
+  core-js: true
 
 minimumReleaseAgeExclude:
   - '@posthog/core@1.35.2'
-  
+
