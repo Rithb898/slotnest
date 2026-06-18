@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-process.env.NODE_ENV ||= "test";
+Object.assign(process.env, { NODE_ENV: process.env.NODE_ENV ?? "test" });
 process.env.DATABASE_URL ||=
   "postgres://postgres:postgres@localhost:5432/postgres";
 process.env.CORSAIR_KEK ||= "test-kek";
