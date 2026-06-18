@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { APIError } from "better-auth";
 import { auth } from ".";
 
 export async function signInWithEmail(formData: FormData) {
@@ -11,14 +12,17 @@ export async function signInWithEmail(formData: FormData) {
     return { error: "Email and password are required" };
   }
 
-  const result = await auth.api.signInEmail({
-    email,
-    password,
-    skipCookieError: true,
-  });
-
-  if (result.error) {
-    return { error: result.error.message || "Sign in failed" };
+  try {
+    await auth.api.signInEmail({
+      body: {
+        email,
+        password,
+      },
+    });
+  } catch (error) {
+    return {
+      error: error instanceof APIError ? error.message : "Sign in failed",
+    };
   }
 
   redirect("/today");
@@ -33,15 +37,18 @@ export async function signUpWithEmail(formData: FormData) {
     return { error: "All fields are required" };
   }
 
-  const result = await auth.api.signUpEmail({
-    name,
-    email,
-    password,
-    skipCookieError: true,
-  });
-
-  if (result.error) {
-    return { error: result.error.message || "Sign up failed" };
+  try {
+    await auth.api.signUpEmail({
+      body: {
+        name,
+        email,
+        password,
+      },
+    });
+  } catch (error) {
+    return {
+      error: error instanceof APIError ? error.message : "Sign up failed",
+    };
   }
 
   redirect("/today");
@@ -54,10 +61,18 @@ export async function requestPasswordReset(formData: FormData) {
     return { error: "Email is required" };
   }
 
-  await auth.api.forgetPassword({
-    email,
-    redirectURL: `${process.env.BETTER_AUTH_URL || ""}/reset-password`,
-  });
+  try {
+    await auth.api.requestPasswordReset({
+      body: {
+        email,
+        redirectTo: `${process.env.BETTER_AUTH_URL || ""}/reset-password`,
+      },
+    });
+  } catch (error) {
+    return {
+      error: error instanceof APIError ? error.message : "Password reset failed",
+    };
+  }
 
   return { success: true };
 }
@@ -70,13 +85,17 @@ export async function resetPassword(formData: FormData) {
     return { error: "Password and token are required" };
   }
 
-  const result = await auth.api.resetPassword({
-    newPassword: password,
-    token,
-  });
-
-  if (result.error) {
-    return { error: result.error.message || "Password reset failed" };
+  try {
+    await auth.api.resetPassword({
+      body: {
+        newPassword: password,
+        token,
+      },
+    });
+  } catch (error) {
+    return {
+      error: error instanceof APIError ? error.message : "Password reset failed",
+    };
   }
 
   redirect("/sign-in");
