@@ -46,6 +46,7 @@ export function ReplyDialog({
 }) {
   const utils = api.useUtils();
   const [to, setTo] = useState("");
+  const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [aiUnavailable, setAiUnavailable] = useState(false);
   const connections = api.connections.list.useQuery();
@@ -61,6 +62,7 @@ export function ReplyDialog({
   useEffect(() => {
     if (!open || !draft) return;
     setTo(draft.to);
+    setSubject(draft.subject);
     setBody(draft.body);
     setAiUnavailable(false);
   }, [open, draft]);
@@ -72,6 +74,9 @@ export function ReplyDialog({
       });
       void utils.gmail.inbox.invalidate();
       void utils.gmail.message.invalidate();
+      void utils.gmail.thread.invalidate();
+      void utils.gmail.sent.invalidate();
+      void utils.workspace.dailyBrief.invalidate();
       onSent?.();
       onOpenChange(false);
     },
@@ -86,6 +91,8 @@ export function ReplyDialog({
         description: "Added to Gmail Sent.",
       });
       void utils.gmail.inbox.invalidate();
+      void utils.gmail.sent.invalidate();
+      void utils.workspace.dailyBrief.invalidate();
       onSent?.();
       onOpenChange(false);
     },
@@ -117,7 +124,7 @@ export function ReplyDialog({
     },
   });
 
-  const valid = Boolean(draft?.subject.trim() && to.trim() && body.trim());
+  const valid = Boolean(subject.trim() && to.trim() && body.trim());
   const canDraftWithAi =
     Boolean(draft?.messageId) && !aiUnavailable && !aiBudgetExhausted;
 
@@ -126,14 +133,14 @@ export function ReplyDialog({
     if (!draft.threadId) {
       sendEmail.mutate({
         to: to.trim(),
-        subject: draft.subject,
+        subject: subject.trim(),
         body: body.trim(),
       });
       return;
     }
     sendReply.mutate({
       to: to.trim(),
-      subject: draft.subject,
+      subject: subject.trim(),
       body: body.trim(),
       threadId: draft.threadId,
       messageId: draft.messageId,
@@ -174,7 +181,12 @@ export function ReplyDialog({
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="reply-subject">Subject</Label>
-            <Input id="reply-subject" value={draft?.subject ?? ""} readOnly />
+            <Input
+              id="reply-subject"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              readOnly={Boolean(draft?.threadId)}
+            />
           </div>
 
           <div className="flex flex-col gap-1.5">

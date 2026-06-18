@@ -23,6 +23,7 @@ honor its STOP conditions, and update your row when done.
 | 012  | Settings, trust, and Razorpay billing | P1 | M | 001, 003, 010 | TODO |
 | 013  | One shared AI action budget across all model calls | P1 | L | 005, 009, 010, 011 | DONE (shared daily/monthly AI budget ledger + atomic reservation helper, billing summary exposure, server-side charging for agent/chat/draft/brief, UI lock states, focused budget test, and migration artifact added; `tsc --noEmit` still has unrelated baseline errors outside the touched slice) |
 | 014  | Admin-only settings tab for user search and manual subscription upgrades | P2 | M | 012, 013 | DONE (server-gated admin tab, bounded user search, manual Pro upgrade mutation, and focused verification complete) |
+| 015  | Approval-loop completion for the better Gmail client | P0 | L | 004, 005, 008, 010, 011 | DONE (approval-state persistence added via `approval_state`, Inbox archive/thread view/URL selection and Command Bar compose are live, Today/Drafts/Waiting now persist done/skip/snooze/resolve decisions, focused Biome clean, `pnpm exec drizzle-kit generate`, `pnpm exec tsx lib/approval-state.test.ts`, `pnpm exec tsc --noEmit`, and `git diff --check` all passed; `build`/`dev` not run per repo instruction.) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
@@ -65,6 +66,9 @@ Suggested order: 004, then 006 (user, in parallel), then 005, 007, 008, 009.
 - 014 depends on the existing settings shell and billing summary shape. It is
   intentionally hardcoded to a single server-side email and must remain hidden
   from all other users.
+- 015 completes SlotNest's better-Gmail-client approval loop without drifting
+  into Gmail parity: SlotNest owns approval state, Gmail is mutated only for
+  real Gmail actions such as Archive and sends.
 
 ## Findings considered and rejected
 

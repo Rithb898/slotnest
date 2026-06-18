@@ -234,6 +234,17 @@ export function CommandBar({ children }: { children?: React.ReactNode }) {
     setReplyOpen(true);
   }, []);
 
+  const openCompose = useCallback(() => {
+    setOpen(false);
+    setReplyDraft({
+      to: "",
+      subject: "",
+      body: "",
+      threadId: null,
+    });
+    setReplyOpen(true);
+  }, []);
+
   return (
     <CommandBarContext.Provider value={{ open, setOpen, toggle }}>
       {children}
@@ -399,7 +410,14 @@ export function CommandBar({ children }: { children?: React.ReactNode }) {
                 <CommandItem
                   key={result.id}
                   value={`mail ${result.id} ${result.subject} ${result.fromEmail}`}
-                  onSelect={() => go("/inbox")}
+                  onSelect={() => {
+                    setOpen(false);
+                    router.push(
+                      result.threadId
+                        ? `/inbox?thread=${encodeURIComponent(result.threadId)}&message=${encodeURIComponent(result.id)}`
+                        : `/inbox?message=${encodeURIComponent(result.id)}`,
+                    );
+                  }}
                   className="border-l-2 border-l-transparent data-[selected=true]:border-l-amber-500"
                 >
                   <Search />
@@ -468,7 +486,7 @@ export function CommandBar({ children }: { children?: React.ReactNode }) {
                 <span className="truncate">Prepare approval proposal</span>
               </CommandItem>
             ) : null}
-            <CommandItem onSelect={() => go("/inbox")}>
+            <CommandItem onSelect={openCompose}>
               <PenLine />
               <span>Compose</span>
             </CommandItem>

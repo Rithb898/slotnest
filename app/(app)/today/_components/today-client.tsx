@@ -16,6 +16,7 @@ import {
   Sparkles,
   Sun,
 } from "lucide-react";
+import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -39,11 +40,13 @@ import { triagePriority } from "@/lib/triage";
 import { cn } from "@/lib/utils";
 import {
   chooseBestSlot,
+  defaultSnoozeUntil,
   draftActionLabel,
   draftPreview,
   followUpDraft,
   formatShortDate,
   formatTime,
+  inboxHrefForMessage,
   initials,
   isSchedulingMessage,
   isWaitingMessage,
@@ -58,7 +61,7 @@ import {
 import { authClient } from "@/server/auth/client";
 import { api } from "@/trpc/react";
 
-type ActionState = "approved" | "skipped" | "snoozed" | "resolved";
+type ActionState = "done" | "skipped" | "snoozed" | "resolved";
 
 const PROVIDER_CONNECT = {
   gmail: { label: "Gmail", icon: Mail },
@@ -87,6 +90,9 @@ export function TodayClient() {
   const [replyOpen, setReplyOpen] = useState(false);
   const [inviteDraft, setInviteDraft] = useState<InviteDraft | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteSource, setInviteSource] = useState<WorkspaceMessage | null>(
+    null,
+  );
   // AI-drafted reply bodies, keyed by message id. Cached so re-selecting a row
   // doesn't re-bill the model. "" means drafted-but-empty / unavailable.
   const [aiDrafts, setAiDrafts] = useState<Record<string, string>>({});
@@ -116,6 +122,12 @@ export function TodayClient() {
     { ...todayRange, minMinutes: 30 },
     { ...CALENDAR_POLL_OPTIONS, enabled: calendarConnected },
   );
+  const approvalState = api.gmail.setApprovalState.useMutation({
+    onSuccess: () => {
+      void utils.gmail.inbox.invalidate();
+      void utils.workspace.dailyBrief.invalidate();
+    },
+  });
 
   const todayEvents = useMemo<WorkspaceEvent[]>(() => {
     if (!calendar.data || calendar.data.connected === false) return [];
@@ -141,15 +153,18 @@ export function TodayClient() {
     return inbox.data.messages
       .filter((message) => message.triage.action === "Needs reply")
       .filter((message) => message.replyStatus !== "sent")
-      .filter((message) => actionStates[message.id] !== "skipped")
+      .filter((message) => !actionStates[message.id])
       .sort((a, b) => triagePriority(b.triage) - triagePriority(a.triage))
       .slice(0, 8);
   }, [inbox.data, actionStates]);
 
   const waiting = useMemo<WorkspaceMessage[]>(() => {
     if (!inbox.data) return [];
-    return inbox.data.messages.filter(isWaitingMessage).slice(0, 4);
-  }, [inbox.data]);
+    return inbox.data.messages
+      .filter(isWaitingMessage)
+      .filter((message) => !actionStates[message.id])
+      .slice(0, 4);
+  }, [actionStates, inbox.data]);
 
   const billingEnabled =
     connections.isSuccess && (connections.data?.length ?? 0) > 0;
@@ -324,6 +339,32 @@ export function TodayClient() {
     setActionStates((current) => ({ ...current, [id]: state }));
   }
 
+  async function persistAction(
+    message: WorkspaceMessage,
+    state: ActionState,
+    options?: { snoozedUntil?: Date },
+  ) {
+    setAction(message.id, state);
+    try {
+      await approvalState.mutateAsync({
+        messageId: message.id,
+        threadId: message.threadId,
+        state,
+        sourceInternalDate:
+          message.date instanceof Date
+            ? message.date.toISOString()
+            : (message.date ?? undefined),
+        snoozedUntil: options?.snoozedUntil?.toISOString(),
+      });
+    } catch {
+      setActionStates((current) => {
+        const next = { ...current };
+        delete next[message.id];
+        return next;
+      });
+    }
+  }
+
   function openReply(message: WorkspaceMessage, body = "") {
     if (!message.threadId) return;
     setReplyDraft({
@@ -345,6 +386,7 @@ export function TodayClient() {
   // open slot. The user types the attendee email + adjusts the time, then
   // approves — nothing books without the explicit "Send invite" in the dialog.
   function openScheduler() {
+    setInviteSource(null);
     setInviteDraft({
       summary: "",
       start: bestSlot?.start,
@@ -356,6 +398,7 @@ export function TodayClient() {
   }
 
   function openInvite(message: WorkspaceMessage, slot?: WorkspaceSlot | null) {
+    setInviteSource(message);
     setInviteDraft({
       summary: cleanReplySubject(message.subject, "Meeting"),
       start: slot?.start,
@@ -467,10 +510,16 @@ export function TodayClient() {
                 onRegenerate={() => regenerateDraft(selected.id)}
                 onApprove={() => openReply(selected, selectedReplyBody)}
                 onEdit={() => openReply(selected, selectedReplyBody)}
-                onSkip={() => setAction(selected.id, "skipped")}
-                onSnooze={() => setAction(selected.id, "snoozed")}
+                onSkip={() => void persistAction(selected, "skipped")}
+                onSnooze={() =>
+                  void persistAction(selected, "snoozed", {
+                    snoozedUntil: defaultSnoozeUntil(),
+                  })
+                }
                 onInvite={() => openInvite(selected, bestSlot)}
-                onOpenInbox={() => router.push("/inbox")}
+                onOpenInbox={() =>
+                  router.push(inboxHrefForMessage(selected) as Route)
+                }
               />
             ) : (
               <PanelEmpty icon={Sun}>
@@ -494,8 +543,12 @@ export function TodayClient() {
               onFollowUp={(message) =>
                 openReply(message, followUpDraft(message))
               }
-              onSnooze={(message) => setAction(message.id, "snoozed")}
-              onResolved={(message) => setAction(message.id, "resolved")}
+              onSnooze={(message) =>
+                void persistAction(message, "snoozed", {
+                  snoozedUntil: defaultSnoozeUntil(),
+                })
+              }
+              onResolved={(message) => void persistAction(message, "resolved")}
             />
           </aside>
         </div>
@@ -507,7 +560,12 @@ export function TodayClient() {
         draft={replyDraft}
         onSent={() => {
           if (replyDraft?.messageId) {
-            setAction(replyDraft.messageId, "approved");
+            const sentMessage = queue.find(
+              (message) => message.id === replyDraft.messageId,
+            );
+            if (sentMessage) {
+              void persistAction(sentMessage, "done");
+            }
           }
           void utils.gmail.inbox.invalidate();
         }}
@@ -516,6 +574,12 @@ export function TodayClient() {
         open={inviteOpen}
         onOpenChange={setInviteOpen}
         draft={inviteDraft}
+        onSent={() => {
+          if (inviteSource) {
+            void persistAction(inviteSource, "done");
+          }
+          setInviteSource(null);
+        }}
       />
     </div>
   );
@@ -783,7 +847,7 @@ function DecisionPanel({
 
       <div className="flex flex-wrap items-center gap-2 border-t border-border px-5 py-3">
         <span className="mr-auto text-xs font-medium text-muted-foreground">
-          {state === "approved" ? "Approved" : "Review before anything sends"}
+          {state === "done" ? "Done" : "Review before anything sends"}
         </span>
         <Button variant="ghost" size="sm" onClick={onOpenInbox}>
           Read
@@ -797,7 +861,7 @@ function DecisionPanel({
         <Button variant="secondary" size="sm" onClick={onEdit}>
           Edit
         </Button>
-        <Button size="sm" onClick={onApprove} disabled={state === "approved"}>
+        <Button size="sm" onClick={onApprove} disabled={state === "done"}>
           <CheckCircle2 className="size-4" />
           Approve
         </Button>

@@ -6,6 +6,12 @@ The shared language for SlotNest. Terms only — no implementation details.
 
 - **SlotNest** — An AI-native, keyboard-first command center for Gmail + Google Calendar, built on Corsair. Not a clone; it reshapes email/calendar workflows around speed and AI assistance.
 - **Approve, don't read** — The core interaction model. The AI prepares a decision (triage, draft reply, proposed invite); the User confirms it with one keypress. Surfaces present actions, not raw messages. Inbox-zero by approval, not by reading. For v1, nothing outbound sends or books without a human keypress.
+- **Approval loop** — The complete decision cycle for prepared work: approve, edit, skip, snooze, resolve, or clear it from view. The loop is complete only when the User's decision remains true after they leave or refresh. Avoid: Gmail parity, inbox clone.
+- **Archive** — A real Gmail action that removes a thread from the User's Gmail inbox, falling back to a single message only when no thread exists. Use this term only when SlotNest mutates Gmail state. Avoid: Done.
+- **Done** — A SlotNest approval-loop decision that clears prepared work from SlotNest surfaces without changing Gmail. Avoid: Archive.
+- **Approval state** — SlotNest's record of the User's decision about prepared work, such as done, skipped, snoozed, resolved, or sent. Approval state belongs to SlotNest's workflow and should not be confused with Gmail labels.
+- **Approval target** — The email object an approval-loop decision applies to. Draft replies are tied to a specific source message; visibility decisions such as done, snoozed, skipped, or resolved apply to the whole thread when a thread exists.
+- **Approval wake-up** — The condition that returns hidden prepared work to SlotNest surfaces. Snoozed work wakes when its chosen time arrives; done, skipped, or resolved work wakes only when there is newer inbound activity in the same thread.
 - **Today** — The home surface (`/today`) for a connected User. Shows what needs the User now: emails needing reply (with drafts ready to approve), today's events with free gaps surfaced, and an inline entry into the Agent. Triages; the dedicated pages do the work. Not a metric-card dashboard.
 - **User** — A person with a SlotNest account (authenticated via better-auth). The unit of identity inside SlotNest.
 - **Tenant** — A User as seen by Corsair. The Corsair tenant id equals the better-auth `session.user.id`. All integration calls are scoped to a tenant.
@@ -17,9 +23,12 @@ The shared language for SlotNest. Terms only — no implementation details.
   - **Action** — What the User must do about an email: `Needs reply` | `FYI` | `Ignore`.
   - **Urgency** — How time-sensitive an email is: `Urgent` | `Normal` | `Low`.
 - **Draft reply** — A context-aware LLM-generated reply, editable before the User sends it, for `Needs reply` emails.
+- **Compose** — A User-started outbound email that is reviewed and sent from SlotNest. In v1, Compose is a send flow, not a Gmail draft-management system.
 - **User voice** — How the User actually writes, learned from their own Sent mail. When drafting a reply, the Agent retrieves a few of the User's past sent emails to similar recipients (recipient-scoped) and uses them as style examples so the draft reads like the User wrote it. Grounded in real sent emails, never an invented persona.
 - **AI action budget** — The shared monthly or daily allowance for expensive AI-driven work in SlotNest. Draft replies, chat turns, and other AI-assisted generation draw from the same pool so the app can cap cost without exposing separate confusing counters.
 - **Free-slot scheduling** — Finding open time on the User's calendar and proposing/sending an invite at a real free slot, from natural language.
 - **Email→invite** — A one-shot workflow turning an open email into a calendar invite to the sender (time/title extracted by LLM).
 - **Local cache** — Emails/events pushed via Corsair webhooks and persisted in Postgres; the source for fast local search (not live Gmail polling).
 - **Hybrid search** — Search combining semantic (Qdrant embeddings) and keyword (Corsair/Postgres contains filters) over the local cache.
+- **Search result selection** — Opening the conversation behind a mail search result. If the result belongs to a thread, the thread is the target; otherwise the individual message is the target.
+- **Thread view** — A read-only conversation context for a Gmail thread. It helps the User inspect prior messages before approving an action, without turning SlotNest into a full Gmail conversation clone.

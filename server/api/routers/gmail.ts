@@ -1,7 +1,14 @@
 import { Agent, run } from "@openai/agents";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 
+import {
+  type ApprovalStateRecord,
+  type ApprovalStateValue,
+  approvalStateId,
+  filterMessagesByApprovalState,
+  getApprovalTarget,
+} from "@/lib/approval-state";
 import { env } from "@/lib/config/env";
 import {
   extractBody,
@@ -28,6 +35,7 @@ import { reserveAiActionBudget } from "@/server/billing/ai-action-budget";
 import { corsair } from "@/server/corsair";
 import { db } from "@/server/db";
 import {
+  approvalState,
   corsairAccounts,
   corsairEntities,
   corsairIntegrations,
@@ -182,6 +190,19 @@ type GmailSearchResult = {
   score: number;
   matchedBy: Array<"keyword" | "semantic">;
 };
+
+const approvalStateSchema = z.enum(["done", "skipped", "snoozed", "resolved"]);
+
+function isApprovalStateSchemaMissing(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes("Failed query: select") ||
+    message.includes('relation "approval_state" does not exist') ||
+    message.includes('relation "approval_state"') ||
+    message.includes('column "target_kind" does not exist') ||
+    message.includes('column "target_id" does not exist')
+  );
+}
 
 /** Model used for drafts — stored on each row so prompt/model bumps invalidate. */
 const DRAFT_MODEL = "gpt-4.1-mini";
@@ -433,6 +454,195 @@ async function getMessageTriage(
       ? await classifyAndStoreTriage(cached.entityId, message.triageInput)
       : triage(message.triageInput))
   );
+}
+
+async function getApprovalStatesForMessages(
+  userId: string,
+  messages: ApprovalVisibilityMessage[],
+): Promise<ApprovalStateRecord[]> {
+  const threadIds = [
+    ...new Set(
+      messages
+        .map((message) => message.threadId)
+        .filter((threadId): threadId is string => Boolean(threadId)),
+    ),
+  ];
+  const messageIds = [
+    ...new Set(
+      messages
+        .filter((message) => !message.threadId)
+        .map((message) => message.id),
+    ),
+  ];
+
+  const conditions = [];
+  if (threadIds.length > 0) {
+    conditions.push(
+      and(
+        eq(approvalState.targetKind, "thread"),
+        inArray(approvalState.targetId, threadIds),
+      ),
+    );
+  }
+  if (messageIds.length > 0) {
+    conditions.push(
+      and(
+        eq(approvalState.targetKind, "message"),
+        inArray(approvalState.targetId, messageIds),
+      ),
+    );
+  }
+  if (conditions.length === 0) {
+    return [];
+  }
+
+  let rows: Array<{
+    targetKind: string;
+    targetId: string;
+    threadId: string | null;
+    messageId: string | null;
+    state: string;
+    sourceInternalDate: Date | null;
+    snoozedUntil: Date | null;
+  }>;
+
+  try {
+    rows = await db
+      .select({
+        targetKind: approvalState.targetKind,
+        targetId: approvalState.targetId,
+        threadId: approvalState.threadId,
+        messageId: approvalState.messageId,
+        state: approvalState.state,
+        sourceInternalDate: approvalState.sourceInternalDate,
+        snoozedUntil: approvalState.snoozedUntil,
+      })
+      .from(approvalState)
+      .where(
+        and(
+          eq(approvalState.userId, userId),
+          conditions.length === 1 ? conditions[0] : or(...conditions),
+        ),
+      );
+  } catch (error) {
+    if (isApprovalStateSchemaMissing(error)) {
+      console.warn(
+        "approval_state table unavailable; skipping approval-state filtering.",
+      );
+      return [];
+    }
+    throw error;
+  }
+
+  return rows.map((row) => ({
+    targetKind: row.targetKind as "thread" | "message",
+    targetId: row.targetId,
+    threadId: row.threadId,
+    messageId: row.messageId,
+    state: approvalStateSchema.parse(row.state),
+    sourceInternalDate: row.sourceInternalDate,
+    snoozedUntil: row.snoozedUntil,
+  }));
+}
+
+type ApprovalVisibilityMessage = {
+  id: string;
+  threadId: string | null;
+  date: Date | string | null;
+};
+
+async function resolveSourceInternalDate({
+  tenant,
+  messageId,
+  threadId,
+  fallback,
+}: {
+  tenant: ReturnType<typeof corsair.withTenant>;
+  messageId: string;
+  threadId?: string | null;
+  fallback?: Date | string | null;
+}) {
+  if (threadId) {
+    const rows = await tenant.gmail.db.messages.search({
+      data: { threadId: { equals: threadId } },
+      limit: 100,
+    });
+    const latest = rows.reduce<Date | null>((current, row) => {
+      const next = toDate(row.data.internalDate);
+      if (!next) return current;
+      if (!current || next.getTime() > current.getTime()) {
+        return next;
+      }
+      return current;
+    }, null);
+    if (latest) {
+      return latest;
+    }
+  }
+
+  const cached = await tenant.gmail.db.messages.findByEntityId(messageId);
+  return toDate(cached?.data.internalDate ?? fallback ?? null);
+}
+
+async function upsertApprovalState({
+  userId,
+  tenant,
+  messageId,
+  threadId,
+  state,
+  snoozedUntil,
+  sourceInternalDate,
+}: {
+  userId: string;
+  tenant: ReturnType<typeof corsair.withTenant>;
+  messageId: string;
+  threadId?: string | null;
+  state: ApprovalStateValue;
+  snoozedUntil?: Date | null;
+  sourceInternalDate?: Date | string | null;
+}) {
+  const target = getApprovalTarget({ messageId, threadId });
+  const resolvedSourceInternalDate = await resolveSourceInternalDate({
+    tenant,
+    messageId,
+    threadId,
+    fallback: sourceInternalDate,
+  });
+
+  try {
+    await db
+      .insert(approvalState)
+      .values({
+        id: approvalStateId(userId, target.targetKind, target.targetId),
+        userId,
+        targetKind: target.targetKind,
+        targetId: target.targetId,
+        threadId: target.threadId,
+        messageId: target.messageId,
+        state,
+        sourceInternalDate: resolvedSourceInternalDate,
+        snoozedUntil: snoozedUntil ?? null,
+      })
+      .onConflictDoUpdate({
+        target: approvalState.id,
+        set: {
+          threadId: target.threadId,
+          messageId: target.messageId,
+          state,
+          sourceInternalDate: resolvedSourceInternalDate,
+          snoozedUntil: snoozedUntil ?? null,
+          updatedAt: new Date(),
+        },
+      });
+  } catch (error) {
+    if (isApprovalStateSchemaMissing(error)) {
+      console.warn(
+        "approval_state table unavailable; skipping approval-state persistence.",
+      );
+      return;
+    }
+    throw error;
+  }
 }
 
 function toSearchResult(
@@ -759,13 +969,28 @@ export const gmailRouter = createTRPCRouter({
               maxResults,
               pageToken: input?.pageToken,
             });
+      let visibleSourceMessages = source.messages;
+      try {
+        visibleSourceMessages = filterMessagesByApprovalState(
+          source.messages,
+          await getApprovalStatesForMessages(
+            ctx.session.user.id,
+            source.messages,
+          ),
+        );
+      } catch (error) {
+        console.warn(
+          "Approval-state filtering failed; falling back to raw inbox messages.",
+          error,
+        );
+      }
 
       const triageCache = await getTriageCacheByGmailMessageId(
         ctx.session.user.id,
-        source.messages.map((m) => m.id),
+        visibleSourceMessages.map((m) => m.id),
       );
       const draftRows =
-        source.messages.length > 0
+        visibleSourceMessages.length > 0
           ? await db
               .select({
                 messageId: replyDraft.messageId,
@@ -778,7 +1003,7 @@ export const gmailRouter = createTRPCRouter({
                   eq(replyDraft.userId, ctx.session.user.id),
                   inArray(
                     replyDraft.messageId,
-                    source.messages.map((m) => m.id),
+                    visibleSourceMessages.map((m) => m.id),
                   ),
                 ),
               )
@@ -788,7 +1013,7 @@ export const gmailRouter = createTRPCRouter({
       );
 
       const messages = await Promise.all(
-        source.messages.map(async (message) => {
+        visibleSourceMessages.map(async (message) => {
           const cached = triageCache.get(message.id);
           const labels =
             cached?.triage ??
@@ -820,7 +1045,7 @@ export const gmailRouter = createTRPCRouter({
       // the inbox response never waits on — or fails because of — embedding.
       void embedNewInboxMessages(
         ctx.session.user.id,
-        source.messages.map((m) => m.id),
+        visibleSourceMessages.map((m) => m.id),
       ).catch((error) => {
         console.warn("Embed-on-sync batch failed:", error);
       });
@@ -939,6 +1164,129 @@ export const gmailRouter = createTRPCRouter({
         html: message.html,
         text: message.text,
       };
+    }),
+
+  thread: protectedProcedure
+    .input(
+      z.object({
+        threadId: z.string().min(1),
+        forceFresh: z.boolean().optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const tenant = corsair.withTenant(ctx.session.user.id);
+      const thread = await tenant.gmail.api.threads.get({
+        id: input.threadId,
+        format: "full",
+      });
+
+      const messages = (thread.messages ?? [])
+        .map((message, index) =>
+          normalizeGmailMessage(
+            message as CachedGmailMessage,
+            message.id ?? `${input.threadId}:${index}`,
+          ),
+        )
+        .sort((a, b) => (a.date?.getTime() ?? 0) - (b.date?.getTime() ?? 0))
+        .map((message) => ({
+          id: message.id,
+          threadId: message.threadId,
+          fromName: message.fromName,
+          fromEmail: message.fromEmail,
+          to: message.to,
+          subject: message.subject,
+          messageIdHeader: message.messageIdHeader,
+          references: message.references,
+          date: message.date,
+          snippet: message.snippet,
+          triage: triage(message.triageInput),
+          html: message.html,
+          text: message.text,
+          labels: message.labelIds,
+        }));
+
+      return {
+        id: thread.id ?? input.threadId,
+        snippet: thread.snippet ?? "",
+        messages,
+      };
+    }),
+
+  archive: protectedProcedure
+    .input(
+      z.object({
+        messageId: z.string().min(1),
+        threadId: z.string().nullish(),
+        sourceInternalDate: z.string().nullish(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      const tenant = corsair.withTenant(userId);
+
+      if (input.threadId) {
+        await tenant.gmail.api.threads.modify({
+          id: input.threadId,
+          removeLabelIds: ["INBOX"],
+        });
+      } else {
+        await tenant.gmail.api.messages.modify({
+          id: input.messageId,
+          removeLabelIds: ["INBOX"],
+        });
+      }
+
+      await upsertApprovalState({
+        userId,
+        tenant,
+        messageId: input.messageId,
+        threadId: input.threadId,
+        state: "done",
+        sourceInternalDate: input.sourceInternalDate,
+      });
+
+      return {
+        ok: true as const,
+      };
+    }),
+
+  setApprovalState: protectedProcedure
+    .input(
+      z.object({
+        messageId: z.string().min(1),
+        threadId: z.string().nullish(),
+        state: approvalStateSchema,
+        snoozedUntil: z.string().optional(),
+        sourceInternalDate: z.string().nullish(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      const tenant = corsair.withTenant(userId);
+      const snoozedUntil = input.snoozedUntil
+        ? new Date(input.snoozedUntil)
+        : null;
+
+      if (
+        input.state === "snoozed" &&
+        (!snoozedUntil ||
+          Number.isNaN(snoozedUntil.getTime()) ||
+          snoozedUntil.getTime() <= Date.now())
+      ) {
+        throw new Error("Snooze must be set to a future time.");
+      }
+
+      await upsertApprovalState({
+        userId,
+        tenant,
+        messageId: input.messageId,
+        threadId: input.threadId,
+        state: input.state,
+        snoozedUntil,
+        sourceInternalDate: input.sourceInternalDate,
+      });
+
+      return { ok: true as const };
     }),
 
   /**

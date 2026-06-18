@@ -50,6 +50,13 @@
       "when": 1781769451313,
       "tag": "0006_shared_ai_action_budget",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1781792078729,
+      "tag": "0007_strange_lightspeed",
+      "breakpoints": true
     }
   ]
 }

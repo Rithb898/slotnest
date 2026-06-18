@@ -52,8 +52,10 @@ export function DraftsClient() {
   const [replyOpen, setReplyOpen] = useState(false);
   const [inviteDraft, setInviteDraft] = useState<InviteDraft | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [activeReplyId, setActiveReplyId] = useState<string | null>(null);
-  const [activeInviteId, setActiveInviteId] = useState<string | null>(null);
+  const [activeReplyMessage, setActiveReplyMessage] =
+    useState<WorkspaceMessage | null>(null);
+  const [activeInviteMessage, setActiveInviteMessage] =
+    useState<WorkspaceMessage | null>(null);
   const [draftBodies, setDraftBodies] = useState<Record<string, string>>({});
   const requestedDrafts = useRef<Set<string>>(new Set());
 
@@ -91,6 +93,12 @@ export function DraftsClient() {
   const draftReply = api.gmail.draftReply.useMutation({
     onSuccess: () => {
       void utils.gmail.inbox.invalidate();
+    },
+  });
+  const approvalState = api.gmail.setApprovalState.useMutation({
+    onSuccess: () => {
+      void utils.gmail.inbox.invalidate();
+      void utils.workspace.dailyBrief.invalidate();
     },
   });
 
@@ -191,12 +199,36 @@ export function DraftsClient() {
     setHidden((current) => ({ ...current, [id]: true }));
   }
 
+  async function persistHiddenState(
+    message: WorkspaceMessage,
+    state: "done" | "skipped",
+  ) {
+    hide(message.id);
+    try {
+      await approvalState.mutateAsync({
+        messageId: message.id,
+        threadId: message.threadId,
+        state,
+        sourceInternalDate:
+          message.date instanceof Date
+            ? message.date.toISOString()
+            : (message.date ?? undefined),
+      });
+    } catch {
+      setHidden((current) => {
+        const next = { ...current };
+        delete next[message.id];
+        return next;
+      });
+    }
+  }
+
   function openReply(message: WorkspaceMessage) {
     const body =
       draftBodies[message.id]?.trim() ||
       message.replyBody?.trim() ||
       draftPreview(message);
-    setActiveReplyId(message.id);
+    setActiveReplyMessage(message);
     setReplyDraft({
       to: message.fromEmail,
       subject: toReplySubject(message.subject),
@@ -213,7 +245,7 @@ export function DraftsClient() {
   }
 
   function openInvite(message: WorkspaceMessage) {
-    setActiveInviteId(message.id);
+    setActiveInviteMessage(message);
     setInviteDraft({
       summary: cleanReplySubject(message.subject, "Meeting"),
       start: bestSlot?.start,
@@ -255,7 +287,7 @@ export function DraftsClient() {
         <section className="rounded-xl border border-border bg-card px-4 py-4 sm:px-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex min-w-0 items-start gap-3">
-              <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-[var(--honey-ink)]">
+              <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-honey-ink">
                 <PenLine className="size-4" />
               </span>
               <div>
@@ -353,7 +385,9 @@ export function DraftsClient() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => hide(message.id)}
+                            onClick={() =>
+                              void persistHiddenState(message, "skipped")
+                            }
                           >
                             Skip
                           </Button>
@@ -370,7 +404,7 @@ export function DraftsClient() {
         <section className="rounded-xl border border-border bg-card px-4 py-4 sm:px-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex min-w-0 items-start gap-3">
-              <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-[var(--honey-ink)]">
+              <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-honey-ink">
                 <CalendarPlus className="size-4" />
               </span>
               <div>
@@ -468,7 +502,9 @@ export function DraftsClient() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => hide(message.id)}
+                          onClick={() =>
+                            void persistHiddenState(message, "skipped")
+                          }
                         >
                           Skip
                         </Button>
@@ -495,8 +531,9 @@ export function DraftsClient() {
         onOpenChange={setReplyOpen}
         draft={replyDraft}
         onSent={() => {
-          if (activeReplyId) hide(activeReplyId);
-          void utils.gmail.inbox.invalidate();
+          if (activeReplyMessage) {
+            void persistHiddenState(activeReplyMessage, "done");
+          }
         }}
       />
       <InviteDialog
@@ -504,8 +541,9 @@ export function DraftsClient() {
         onOpenChange={setInviteOpen}
         draft={inviteDraft}
         onSent={() => {
-          if (activeInviteId) hide(activeInviteId);
-          void utils.gmail.inbox.invalidate();
+          if (activeInviteMessage) {
+            void persistHiddenState(activeInviteMessage, "done");
+          }
         }}
       />
     </div>

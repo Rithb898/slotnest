@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { INBOX_POLL_OPTIONS } from "@/lib/query-options";
 import { toReplyReferences, toReplySubject } from "@/lib/reply";
 import {
+  defaultSnoozeUntil,
   followUpDraft,
   formatShortDate,
   isWaitingMessage,
@@ -32,6 +33,7 @@ export function WaitingClient() {
   const [states, setStates] = useState<Record<string, WaitingState>>({});
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyDraft, setReplyDraft] = useState<ReplyDraft | null>(null);
+  const utils = api.useUtils();
 
   const connections = api.connections.list.useQuery();
   const gmailConnected = connections.data?.includes("gmail") ?? false;
@@ -39,12 +41,18 @@ export function WaitingClient() {
     { maxResults: 50 },
     { ...INBOX_POLL_OPTIONS, enabled: gmailConnected },
   );
+  const approvalState = api.gmail.setApprovalState.useMutation({
+    onSuccess: () => {
+      void utils.gmail.inbox.invalidate();
+      void utils.workspace.dailyBrief.invalidate();
+    },
+  });
 
   const waiting = useMemo<WorkspaceMessage[]>(() => {
     if (!inbox.data) return [];
     return inbox.data.messages
       .filter(isWaitingMessage)
-      .filter((message) => states[message.id] !== "resolved")
+      .filter((message) => !states[message.id])
       .sort((a, b) => {
         const ad = a.date ? new Date(a.date).getTime() : 0;
         const bd = b.date ? new Date(b.date).getTime() : 0;
@@ -54,6 +62,32 @@ export function WaitingClient() {
 
   function setState(id: string, state: WaitingState) {
     setStates((current) => ({ ...current, [id]: state }));
+  }
+
+  async function persistState(
+    message: WorkspaceMessage,
+    state: WaitingState,
+    options?: { snoozedUntil?: Date },
+  ) {
+    setState(message.id, state);
+    try {
+      await approvalState.mutateAsync({
+        messageId: message.id,
+        threadId: message.threadId,
+        state,
+        sourceInternalDate:
+          message.date instanceof Date
+            ? message.date.toISOString()
+            : (message.date ?? undefined),
+        snoozedUntil: options?.snoozedUntil?.toISOString(),
+      });
+    } catch {
+      setStates((current) => {
+        const next = { ...current };
+        delete next[message.id];
+        return next;
+      });
+    }
   }
 
   function openFollowUp(message: WorkspaceMessage) {
@@ -162,14 +196,18 @@ export function WaitingClient() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setState(message.id, "snoozed")}
+                        onClick={() =>
+                          void persistState(message, "snoozed", {
+                            snoozedUntil: defaultSnoozeUntil(),
+                          })
+                        }
                       >
                         Snooze
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setState(message.id, "resolved")}
+                        onClick={() => void persistState(message, "resolved")}
                       >
                         Resolved
                       </Button>
@@ -186,9 +224,15 @@ export function WaitingClient() {
         open={replyOpen}
         onOpenChange={setReplyOpen}
         draft={replyDraft}
-        onSent={() =>
-          replyDraft?.messageId && setState(replyDraft.messageId, "resolved")
-        }
+        onSent={() => {
+          if (!replyDraft?.messageId) return;
+          const message = waiting.find(
+            (item) => item.id === replyDraft.messageId,
+          );
+          if (message) {
+            void persistState(message, "resolved");
+          }
+        }}
       />
     </div>
   );

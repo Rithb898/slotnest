@@ -26,6 +26,22 @@ export type WorkspaceEvent = {
   allDay: boolean;
 };
 
+export function inboxHrefForMessage(
+  message: Pick<WorkspaceMessage, "id" | "threadId">,
+) {
+  if (message.threadId) {
+    return `/inbox?thread=${encodeURIComponent(message.threadId)}&message=${encodeURIComponent(message.id)}`;
+  }
+  return `/inbox?message=${encodeURIComponent(message.id)}`;
+}
+
+export function defaultSnoozeUntil(from = new Date()) {
+  const next = new Date(from);
+  next.setDate(next.getDate() + 1);
+  next.setHours(9, 0, 0, 0);
+  return next;
+}
+
 const SCHEDULING_CUES = [
   "meet",
   "meeting",
