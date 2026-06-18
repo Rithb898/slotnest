@@ -196,19 +196,36 @@ async function countAiActionBudgetUsage(
   userId: string,
   periodKey: string,
 ) {
-  const [row] = await db
-    .select({
-      used: sql<number>`coalesce(count(*), 0)::int`,
-    })
-    .from(aiActionBudget)
-    .where(
-      and(
-        eq(aiActionBudget.userId, userId),
-        eq(aiActionBudget.periodKey, periodKey),
-      ),
-    );
+  try {
+    const [row] = await db
+      .select({
+        used: sql<number>`coalesce(count(*), 0)::int`,
+      })
+      .from(aiActionBudget)
+      .where(
+        and(
+          eq(aiActionBudget.userId, userId),
+          eq(aiActionBudget.periodKey, periodKey),
+        ),
+      );
 
-  return row?.used ?? 0;
+    return row?.used ?? 0;
+  } catch (error) {
+    const code =
+      typeof error === "object" && error !== null
+        ? (error as { code?: unknown }).code
+        : undefined;
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      code === "42P01"
+    ) {
+      return 0;
+    }
+
+    throw error;
+  }
 }
 
 export async function getAiActionBudgetSummary(
