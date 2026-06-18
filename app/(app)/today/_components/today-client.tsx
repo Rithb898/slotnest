@@ -151,7 +151,11 @@ export function TodayClient() {
   const queue = useMemo<WorkspaceMessage[]>(() => {
     if (!inbox.data) return [];
     return inbox.data.messages
-      .filter((message) => message.triage.action === "Needs reply")
+      .filter(
+        (message) =>
+          message.triage.action === "Needs reply" ||
+          message.triage.action === "Schedule",
+      )
       .filter((message) => message.replyStatus !== "sent")
       .filter((message) => !actionStates[message.id])
       .sort((a, b) => triagePriority(b.triage) - triagePriority(a.triage))

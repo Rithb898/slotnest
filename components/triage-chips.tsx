@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 const actionStyles: Record<TriageAction, string> = {
   // Needs reply — leans on the urgent hue family but muted (it's an action, not an alarm).
   "Needs reply": "bg-destructive/12 text-[var(--destructive)]",
+  Schedule: "bg-secondary text-secondary-foreground",
   FYI: "bg-info-subtle text-[var(--info)]",
   Ignore: "bg-muted text-muted-foreground",
 };
@@ -20,6 +21,13 @@ const urgencyStyles: Record<TriageUrgency, string> = {
   Urgent: "bg-destructive/12 text-[var(--destructive)]",
   Normal: "bg-info-subtle text-[var(--info)]",
   Low: "bg-muted text-muted-foreground",
+};
+
+const actionLabels: Record<TriageAction, string> = {
+  "Needs reply": "Needs reply",
+  Schedule: "Schedule",
+  FYI: "Info only",
+  Ignore: "Ignore",
 };
 
 function Chip({
@@ -42,7 +50,7 @@ function Chip({
 }
 
 export function ActionChip({ action }: { action: TriageAction }) {
-  return <Chip className={actionStyles[action]}>{action}</Chip>;
+  return <Chip className={actionStyles[action]}>{actionLabels[action]}</Chip>;
 }
 
 export function UrgencyChip({ urgency }: { urgency: TriageUrgency }) {

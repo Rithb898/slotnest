@@ -20,7 +20,7 @@ The shared language for SlotNest. Terms only — no implementation details.
 - **Agent** — The LLM-driven assistant (OpenAI Agents SDK + Corsair MCP) that performs email/calendar actions from natural language.
 - **Chat** — The dedicated conversational surface (`/chat`) where the User talks to the Agent in multi-turn natural language. The non-technical front door to the Agent: it shows its work inline (the emails it found, the slot it picked, the draft it wrote) and ends every outbound action in an approval card — it proposes, the User approves. Distinct from the Command bar (one-shot, keyboard-first); both reach the same Agent.
 - **Triage** — Classification of an incoming email along two axes: an **Action** label and an **Urgency** level. Combined into a sortable priority.
-  - **Action** — What the User must do about an email: `Needs reply` | `FYI` | `Ignore`.
+  - **Action** — What the User must do about an email: `Needs reply` | `Schedule` | `FYI` | `Ignore`.
   - **Urgency** — How time-sensitive an email is: `Urgent` | `Normal` | `Low`.
 - **Draft reply** — A context-aware LLM-generated reply, editable before the User sends it, for `Needs reply` emails.
 - **Compose** — A User-started outbound email that is reviewed and sent from SlotNest. In v1, Compose is a send flow, not a Gmail draft-management system.

@@ -187,7 +187,7 @@ Flat by default. SlotNest conveys depth through tonal layering — the `panel` n
 
 ### Chips (triage labels)
 - **Style:** Soft-filled, not outlined. Background is a 12–16% tint of the semantic hue; text is the full-strength semantic color or ink. 6px radius, Label type, sentence case.
-- **State:** Action labels (`Needs reply` / `FYI` / `Ignore`) and urgency (`Urgent` / `Normal` / `Low`) read as quiet chips, never as honey.
+- **State:** Action labels (`Needs reply` / `Schedule` / `FYI` / `Ignore`) and urgency (`Urgent` / `Normal` / `Low`) read as quiet chips, never as honey.
 
 ### Cards / Containers
 - **Corner Style:** 10px (`rounded.lg`) for panels, 8px for inner rows.

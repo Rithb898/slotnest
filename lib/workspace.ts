@@ -114,15 +114,21 @@ function includesAny(text: string, cues: string[]) {
 }
 
 export function isSchedulingMessage(
-  message: Pick<WorkspaceMessage, "subject" | "snippet">,
+  message: Pick<WorkspaceMessage, "subject" | "snippet"> & {
+    triage?: Pick<Triage, "action">;
+  },
 ): boolean {
-  return includesAny(messageText(message), SCHEDULING_CUES);
+  return (
+    message.triage?.action === "Schedule" ||
+    includesAny(messageText(message), SCHEDULING_CUES)
+  );
 }
 
 export function isWaitingMessage(
   message: Pick<WorkspaceMessage, "subject" | "snippet" | "triage">,
 ): boolean {
   const text = messageText(message);
+  if (message.triage.action === "Schedule") return false;
   return (
     message.triage.action !== "Needs reply" &&
     (includesAny(text, WAITING_CUES) || message.triage.urgency === "Low")

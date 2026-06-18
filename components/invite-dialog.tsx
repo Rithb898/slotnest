@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Dialog,
   DialogContent,
@@ -15,6 +16,18 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/trpc/react";
 
@@ -44,12 +57,21 @@ type CreatedEvent = {
   summary: string;
 };
 
+const TIME_OPTIONS = Array.from({ length: 96 }, (_, index) => {
+  const hours = Math.floor(index / 4);
+  const minutes = (index % 4) * 15;
+  return `${pad(hours)}:${pad(minutes)}`;
+});
+
+function pad(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
 /** Format an ISO string into the value a <input type="datetime-local"> wants. */
 function toLocalInput(iso?: string): string {
   if (!iso) return "";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
     d.getHours(),
   )}:${pad(d.getMinutes())}`;
@@ -60,6 +82,106 @@ function fromLocalInput(value: string): string {
   if (!value) return "";
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? "" : d.toISOString();
+}
+
+function toDatePart(date: Date): string {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function getDatePart(value: string): string {
+  return value.split("T")[0] ?? "";
+}
+
+function getTimePart(value: string): string {
+  return value.split("T")[1]?.slice(0, 5) ?? "";
+}
+
+function formatDate(value: string): string {
+  if (!value) return "Pick date";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Pick date";
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function DateTimeField({
+  id,
+  label,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const datePart = getDatePart(value);
+  const timePart = getTimePart(value);
+  const selected = value ? new Date(value) : undefined;
+  const timeOptions = TIME_OPTIONS.includes(timePart)
+    ? TIME_OPTIONS
+    : [timePart, ...TIME_OPTIONS].filter(Boolean).sort();
+
+  function setDate(date?: Date) {
+    if (!date) return;
+    onChange(`${toDatePart(date)}T${timePart || "09:00"}`);
+  }
+
+  function setTime(nextTime: string | null) {
+    if (!nextTime) return;
+    onChange(`${datePart || toDatePart(new Date())}T${nextTime}`);
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor={id}>{label}</Label>
+      <div className="grid gap-2">
+        <Popover>
+          <PopoverTrigger
+            render={
+              <Button
+                id={id}
+                variant="outline"
+                className="h-8 w-full min-w-0 justify-start overflow-hidden rounded-lg bg-input/50 px-3 font-normal"
+              />
+            }
+          >
+            <span className="min-w-0 truncate">{formatDate(value)}</span>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-auto p-0">
+            <Calendar
+              mode="single"
+              selected={
+                selected && !Number.isNaN(selected.getTime())
+                  ? selected
+                  : undefined
+              }
+              onSelect={setDate}
+            />
+          </PopoverContent>
+        </Popover>
+
+        <Select value={timePart} onValueChange={setTime}>
+          <SelectTrigger
+            aria-label={`${label} time`}
+            className="h-8 w-full rounded-lg bg-input/50"
+          >
+            <SelectValue placeholder="Time" />
+          </SelectTrigger>
+          <SelectContent align="end" className="max-h-64">
+            {timeOptions.map((time) => (
+              <SelectItem key={time} value={time}>
+                {time}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
 }
 
 export function InviteDialog({
@@ -170,25 +292,19 @@ export function InviteDialog({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="invite-start">Start</Label>
-              <Input
-                id="invite-start"
-                type="datetime-local"
-                value={start}
-                onChange={(e) => setStart(e.target.value)}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="invite-end">End</Label>
-              <Input
-                id="invite-end"
-                type="datetime-local"
-                value={end}
-                onChange={(e) => setEnd(e.target.value)}
-              />
-            </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <DateTimeField
+              id="invite-start"
+              label="Start"
+              value={start}
+              onChange={setStart}
+            />
+            <DateTimeField
+              id="invite-end"
+              label="End"
+              value={end}
+              onChange={setEnd}
+            />
           </div>
 
           {showAttendees ? (

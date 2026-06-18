@@ -161,13 +161,17 @@ export function AppSidebar() {
 
   const needsYou =
     inbox.data?.messages.filter(
-      (m) => m.triage.action === "Needs reply" && m.replyStatus !== "sent",
+      (m) =>
+        (m.triage.action === "Needs reply" || m.triage.action === "Schedule") &&
+        m.replyStatus !== "sent",
     ).length ?? 0;
   const waitingCount =
     inbox.data?.messages.filter(isWaitingMessage).length ?? 0;
   const hasUrgent =
     inbox.data?.messages.some(
-      (m) => m.triage.action === "Needs reply" && m.triage.urgency === "Urgent",
+      (m) =>
+        (m.triage.action === "Needs reply" || m.triage.action === "Schedule") &&
+        m.triage.urgency === "Urgent",
     ) ?? false;
 
   const todayCount = calendar.data?.connected

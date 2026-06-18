@@ -11,7 +11,7 @@
  */
 
 // Action label: what the user must do about an email.
-export type TriageAction = "Needs reply" | "FYI" | "Ignore";
+export type TriageAction = "Needs reply" | "Schedule" | "FYI" | "Ignore";
 // Urgency level: how time-sensitive an email is.
 export type TriageUrgency = "Urgent" | "Normal" | "Low";
 
@@ -62,6 +62,23 @@ const REPLY_CUES = [
   "feedback",
   "rsvp",
   "reply",
+];
+
+const SCHEDULE_CUES = [
+  "meet",
+  "meeting",
+  "call",
+  "available",
+  "availability",
+  "schedule",
+  "calendar",
+  "book",
+  "invite",
+  "time that works",
+  "find a time",
+  "free for",
+  "free on",
+  "reschedule",
 ];
 
 // Senders/subjects that are almost never worth a reply.
@@ -120,6 +137,8 @@ export function triage(input: TriageInput): Triage {
   if (isBulk || hasCue(from, IGNORE_CUES) || hasCue(text, IGNORE_CUES)) {
     // Promotions, social, forums, newsletters, receipts — never a reply.
     action = "Ignore";
+  } else if (hasCue(text, SCHEDULE_CUES)) {
+    action = "Schedule";
   } else if (hasCue(text, REPLY_CUES)) {
     action = "Needs reply";
   } else if (hasCue(text, FYI_CUES)) {
@@ -167,7 +186,8 @@ function ageInMs(date: Date | string | null): number {
  */
 export function triagePriority(t: Triage): number {
   const actionWeight: Record<TriageAction, number> = {
-    "Needs reply": 200,
+    "Needs reply": 240,
+    Schedule: 230,
     FYI: 100,
     Ignore: 0,
   };

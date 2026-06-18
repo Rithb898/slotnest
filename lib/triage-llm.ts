@@ -9,7 +9,7 @@ export const TRIAGE_LLM_MODEL = "gpt-4.1-mini";
 export const TRIAGE_FALLBACK_MODEL = "heuristic";
 
 const triageOutputSchema = z.object({
-  action: z.enum(["Needs reply", "FYI", "Ignore"]),
+  action: z.enum(["Needs reply", "Schedule", "FYI", "Ignore"]),
   urgency: z.enum(["Urgent", "Normal", "Low"]),
 });
 

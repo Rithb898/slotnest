@@ -123,10 +123,11 @@ Rules:
 export const TRIAGE_INSTRUCTIONS = `Classify one email for SlotNest.
 
 Return exactly one JSON object and no other text:
-{"action":"Needs reply|FYI|Ignore","urgency":"Urgent|Normal|Low"}
+{"action":"Needs reply|Schedule|FYI|Ignore","urgency":"Urgent|Normal|Low"}
 
 Action labels:
-- Needs reply: the user likely needs to respond, decide, approve, schedule, review, or answer a direct question.
+- Needs reply: the user likely needs to respond, decide, approve, review, or answer a direct question.
+- Schedule: the email is primarily about booking, rescheduling, availability, calls, meetings, interviews, demos, or calendar invites.
 - FYI: useful information, status, confirmation, or context that does not require a reply.
 - Ignore: promotions, newsletters, receipts, automated notices, social/forum updates, spam, or bulk mail.
 
@@ -139,4 +140,5 @@ Rules:
 - Use only the supplied email fields.
 - Do not invent facts.
 - Prefer Ignore + Low for bulk/promotional mail.
+- Prefer Schedule when the main next step is finding or confirming a time.
 - Prefer Needs reply when the sender asks the user a direct question or requests confirmation.`;

@@ -65,7 +65,7 @@ async function isGmailConnected(userId: string): Promise<boolean> {
 }
 
 const storedTriageSchema = z.object({
-  action: z.enum(["Needs reply", "FYI", "Ignore"]),
+  action: z.enum(["Needs reply", "Schedule", "FYI", "Ignore"]),
   urgency: z.enum(["Urgent", "Normal", "Low"]),
 });
 
