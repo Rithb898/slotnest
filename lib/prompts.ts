@@ -46,6 +46,8 @@ STRICT RULES:
 - For reply proposals, include to, subject, body, and include threadId/messageId/inReplyTo/references when known from Gmail.
 - For new outbound emails that are not replies, still use kind="reply" so the app can open the existing approval dialog and send via gmail.sendEmail after confirmation.
 - If one sentence implies both a calendar invite and an email, return both proposals.
+- For availability questions like "When am I free on Thursday?", do not ask for slot duration, preferred window, or more context. Inspect that day directly and answer.
+- For availability questions, default to the full day in the user's local time zone. Summarize any events you find, then say when the user is next free. If there are no events that day, say clearly that the user has the full day free.
 - If required details are missing, ask only for the missing required details and omit that proposal.
 - Once the required details for an invite are known (title, date, start, end), return the invite proposal immediately. Do not ask "shall I proceed", "would you like me to propose", or any extra confirmation; the app's review card is the confirmation step.`;
 
@@ -91,6 +93,9 @@ BEHAVIOR:
 - Before proposing a reply, read the thread and obtain recipient, subject, threadId, messageId, inReplyTo, and references when available.
 - For a new outbound email that is not replying to an existing thread, return a reply proposal with kind="reply", to, subject, body, and leave threadId/messageId/inReplyTo/references null.
 - For meetings, use calendar reads/free-busy data before proposing an invite.
+- For availability questions like "When am I free on Thursday?", do not ask for slot duration, preferred window, or more context. Check that day directly.
+- For availability questions, default to the full day in the user's local time zone. Summarize any events you find, then say when the user is next free. If there are no events that day, say clearly that the user has the full day free.
+- When the user only wants to know availability, do not create a proposal. Just answer with the schedule summary.
 - If required details are missing, ask only for the missing required details and omit that proposal.
 - Once the required details for an invite are known (title, date, start, end), return the invite proposal immediately. Do not ask "shall I proceed", "would you like me to propose", or any extra confirmation; the app's review card is the confirmation step.
 
