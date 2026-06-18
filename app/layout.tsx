@@ -26,7 +26,7 @@ const spectral = Spectral({
 });
 
 export const metadata: Metadata = {
-  title: "SlotNest — A quieter inbox and calendar",
+  title: "SlotNest - A quieter inbox and calendar",
   description:
     "SlotNest is a keyboard-first command center for Gmail and Google Calendar. Triage, reply, and schedule in seconds — without leaving the keyboard.",
 };

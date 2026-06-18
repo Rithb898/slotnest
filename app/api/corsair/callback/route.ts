@@ -6,6 +6,11 @@ import { corsair } from "@/server/corsair";
 
 const REDIRECT_URI = `${env.APP_URL}/api/corsair/callback`;
 const PLUGINS = ["gmail", "googlecalendar"] as const;
+const APP_ORIGIN = new URL(env.APP_URL);
+
+function appUrl(path: string) {
+  return new URL(path, APP_ORIGIN);
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -16,7 +21,7 @@ export async function GET(request: NextRequest) {
   // state: clear both cookies and land them back on Settings, not a bare 400.
   if (!code || !state) {
     const res = NextResponse.redirect(
-      new URL("/settings?tab=connections&error=oauth_cancelled", request.url),
+      appUrl("/settings?tab=connections&error=oauth_cancelled"),
     );
     res.cookies.delete("corsair_oauth_state");
     res.cookies.delete("corsair_oauth_next");
@@ -26,7 +31,7 @@ export async function GET(request: NextRequest) {
   const storedState = request.cookies.get("corsair_oauth_state")?.value;
   if (!storedState || storedState !== state) {
     const res = NextResponse.redirect(
-      new URL("/settings?tab=connections&error=oauth_failed", request.url),
+      appUrl("/settings?tab=connections&error=oauth_failed"),
     );
     res.cookies.delete("corsair_oauth_state");
     res.cookies.delete("corsair_oauth_next");
@@ -52,11 +57,8 @@ export async function GET(request: NextRequest) {
 
     const res = NextResponse.redirect(
       chainNext
-        ? new URL(`/api/corsair/connect?plugin=${chainNext}`, request.url)
-        : new URL(
-            `/settings?tab=connections&connected=${result.plugin}`,
-            request.url,
-          ),
+        ? appUrl(`/api/corsair/connect?plugin=${chainNext}`)
+        : appUrl(`/settings?tab=connections&connected=${result.plugin}`),
     );
     res.cookies.delete("corsair_oauth_state");
     // The next connect leg sets its own cookie (with no further `next`), so
@@ -66,7 +68,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("[corsair] OAuth callback failed", error);
     const res = NextResponse.redirect(
-      new URL("/settings?tab=connections&error=oauth_failed", request.url),
+      appUrl("/settings?tab=connections&error=oauth_failed"),
     );
     res.cookies.delete("corsair_oauth_state");
     res.cookies.delete("corsair_oauth_next");
