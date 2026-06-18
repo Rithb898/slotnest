@@ -27,10 +27,6 @@ export function SentClient() {
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-5 py-6 sm:px-6 lg:px-8">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1 text-xs font-medium text-muted-foreground">
-              <MailCheck className="size-3.5" />
-              Gmail sent mail
-            </div>
             <h1 className="mt-3 text-2xl font-semibold tracking-tight">Sent</h1>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
               Emails sent from Gmail, including messages approved in SlotNest.

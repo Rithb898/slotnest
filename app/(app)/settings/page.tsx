@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
+import { isAdminEmail } from "@/lib/admin";
+import { getSession } from "@/server/auth/server";
 import { api } from "@/trpc/server";
 import { SettingsClient } from "./_components/settings-client";
 
@@ -29,11 +31,18 @@ export default function SettingsPage() {
 }
 
 async function SettingsData() {
+  const session = await getSession();
   const [connected, billing] = await Promise.all([
     api.connections.list(),
     api.billing.summary(),
   ]);
-  return <SettingsClient billing={billing} connected={connected} />;
+  return (
+    <SettingsClient
+      billing={billing}
+      connected={connected}
+      isAdmin={isAdminEmail(session?.user.email)}
+    />
+  );
 }
 
 function SettingsFallback() {

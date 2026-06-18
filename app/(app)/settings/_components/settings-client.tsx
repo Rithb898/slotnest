@@ -3,10 +3,13 @@
 import {
   CalendarDays,
   Check,
+  ChevronLeft,
+  ChevronRight,
   CreditCard,
   LogOut,
   Mail,
   Plug,
+  Search,
   Shield,
   ShieldCheck,
   Sparkles,
@@ -16,6 +19,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { BillingUpgradeButton } from "@/components/billing-upgrade-button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -26,7 +30,25 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BILLING_PLAN_CATALOG } from "@/lib/billing-plans";
 import { cn } from "@/lib/utils";
@@ -34,8 +56,10 @@ import { authClient } from "@/server/auth/client";
 import type { RouterOutputs } from "@/trpc/react";
 import { api } from "@/trpc/react";
 
-type SettingsTab = "connections" | "billing" | "trust" | "account";
+type SettingsTab = "connections" | "billing" | "trust" | "account" | "admin";
 type BillingSummary = RouterOutputs["billing"]["summary"];
+type AdminSearchResult = RouterOutputs["admin"]["searchUsers"];
+type AdminUser = AdminSearchResult["users"][number];
 
 const PROVIDERS = [
   {
@@ -55,19 +79,14 @@ const PROVIDERS = [
 export function SettingsClient({
   connected,
   billing,
+  isAdmin,
 }: {
   connected: string[];
   billing: BillingSummary;
+  isAdmin: boolean;
 }) {
   const searchParams = useSearchParams();
-  const initialTab: SettingsTab =
-    searchParams.get("tab") === "billing"
-      ? "billing"
-      : searchParams.get("tab") === "trust"
-        ? "trust"
-        : searchParams.get("tab") === "account"
-          ? "account"
-          : "connections";
+  const initialTab = resolveSettingsTab(searchParams, isAdmin);
   const [tab, setTab] = useState<SettingsTab>(initialTab);
   const handled = useRef(false);
 
@@ -88,6 +107,10 @@ export function SettingsClient({
     }
   }, [searchParams]);
 
+  useEffect(() => {
+    setTab(resolveSettingsTab(searchParams, isAdmin));
+  }, [isAdmin, searchParams]);
+
   return (
     <Tabs value={tab} onValueChange={(v) => setTab(v as SettingsTab)}>
       <TabsList className="w-full flex-wrap justify-start gap-1 sm:w-auto">
@@ -106,6 +129,12 @@ export function SettingsClient({
         <TabsTrigger value="account" className="flex-1">
           Account
         </TabsTrigger>
+        {isAdmin ? (
+          <TabsTrigger value="admin" className="flex-1">
+            <ShieldCheck />
+            Admin
+          </TabsTrigger>
+        ) : null}
       </TabsList>
 
       <TabsContent value="connections" className="pt-5">
@@ -123,8 +152,26 @@ export function SettingsClient({
       <TabsContent value="account" className="pt-5">
         <AccountPanel />
       </TabsContent>
+
+      {isAdmin ? (
+        <TabsContent value="admin" className="pt-5">
+          <AdminPanel />
+        </TabsContent>
+      ) : null}
     </Tabs>
   );
+}
+
+function resolveSettingsTab(
+  searchParams: ReturnType<typeof useSearchParams>,
+  isAdmin: boolean,
+): SettingsTab {
+  const tab = searchParams.get("tab");
+  if (tab === "billing") return "billing";
+  if (tab === "trust") return "trust";
+  if (tab === "account") return "account";
+  if (tab === "admin" && isAdmin) return "admin";
+  return "connections";
 }
 
 function labelFor(key: string): string {
@@ -363,6 +410,256 @@ function BillingPanel({ billing }: { billing: BillingSummary }) {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+const ADMIN_PAGE_SIZE = 10;
+
+function AdminPanel() {
+  const utils = api.useUtils();
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [offset, setOffset] = useState(0);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [upgradingUserId, setUpgradingUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setSearchQuery(searchInput.trim());
+      setOffset(0);
+      setActionError(null);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
+
+  const usersQuery = api.admin.searchUsers.useQuery(
+    {
+      q: searchQuery,
+      limit: ADMIN_PAGE_SIZE,
+      offset,
+    },
+    { staleTime: 15_000 },
+  );
+
+  const upgrade = api.admin.upgradeToPro.useMutation({
+    onMutate: ({ userId }) => {
+      setUpgradingUserId(userId);
+      setActionError(null);
+    },
+    onSuccess: async () => {
+      toast.success("Subscription upgraded to Pro.");
+      await utils.admin.searchUsers.invalidate();
+      setActionError(null);
+    },
+    onError: (error) => {
+      setActionError(error.message);
+    },
+    onSettled: () => {
+      setUpgradingUserId(null);
+    },
+  });
+
+  const users = usersQuery.data?.users ?? [];
+  const total = usersQuery.data?.total ?? 0;
+  const hasPrev = offset > 0;
+  const hasNext = offset + ADMIN_PAGE_SIZE < total;
+  const start = total === 0 ? 0 : offset + 1;
+  const end = Math.min(offset + ADMIN_PAGE_SIZE, total);
+  const isLoading = usersQuery.isLoading && !usersQuery.data;
+
+  function handleSearch(value: string) {
+    setSearchInput(value);
+    setOffset(0);
+    setActionError(null);
+  }
+
+  function handleUpgrade(user: AdminUser) {
+    if (upgrade.isPending || upgradingUserId) return;
+    upgrade.mutate({ userId: user.id });
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle>Admin</CardTitle>
+            <CardDescription>
+              Search platform users and manually move an account to Pro.
+            </CardDescription>
+          </div>
+          <Badge variant="ghost" className="shrink-0 uppercase tracking-wide">
+            Server gated
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={searchInput}
+              onChange={(event) => handleSearch(event.target.value)}
+              placeholder="Search by name or email"
+              className="h-10 rounded-2xl pl-9"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                setOffset((current) => Math.max(current - ADMIN_PAGE_SIZE, 0))
+              }
+              disabled={!hasPrev}
+            >
+              <ChevronLeft className="size-3.5" />
+              Prev
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setOffset((current) => current + ADMIN_PAGE_SIZE)}
+              disabled={!hasNext}
+            >
+              Next
+              <ChevronRight className="size-3.5" />
+            </Button>
+          </div>
+        </div>
+
+        {actionError ? (
+          <Alert variant="destructive">
+            <AlertTitle>Upgrade failed</AlertTitle>
+            <AlertDescription>{actionError}</AlertDescription>
+          </Alert>
+        ) : null}
+
+        <div className="flex items-center justify-between gap-3 px-1 text-xs text-muted-foreground">
+          <span>
+            {total === 0
+              ? "No users found"
+              : `Showing ${start}-${end} of ${total}`}
+          </span>
+          <span>
+            {searchQuery ? `Filtered by "${searchQuery}"` : "All users"}
+          </span>
+        </div>
+
+        <div className="rounded-3xl border border-foreground/5 bg-background/60">
+          {isLoading ? (
+            <div className="flex flex-col gap-3 p-4">
+              <Skeleton className="h-10 w-full rounded-2xl" />
+              <Skeleton className="h-10 w-full rounded-2xl" />
+              <Skeleton className="h-10 w-full rounded-2xl" />
+            </div>
+          ) : usersQuery.isError ? (
+            <Empty className="min-h-56 border-0 p-8">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <ShieldCheck className="size-5" />
+                </EmptyMedia>
+                <EmptyTitle>Could not load users</EmptyTitle>
+                <EmptyDescription>{usersQuery.error.message}</EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ) : users.length === 0 ? (
+            <Empty className="min-h-56 border-0 p-8">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <Search className="size-5" />
+                </EmptyMedia>
+                <EmptyTitle>No matching users</EmptyTitle>
+                <EmptyDescription>
+                  Try a different name or email address.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>User</TableHead>
+                  <TableHead>Plan</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Renewal</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {users.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell>
+                      <div className="flex min-w-0 flex-col">
+                        <div className="truncate font-medium">{user.name}</div>
+                        <div className="truncate text-xs text-muted-foreground">
+                          {user.email}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        <Badge
+                          variant={
+                            user.currentPlan.name === "pro"
+                              ? "default"
+                              : "outline"
+                          }
+                        >
+                          {user.currentPlan.label}
+                        </Badge>
+                        {user.subscription ? (
+                          <Badge variant="ghost">
+                            {user.subscription.plan}
+                          </Badge>
+                        ) : (
+                          <Badge variant="ghost">No subscription</Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {user.subscription ? (
+                        <Badge variant="outline">
+                          {user.subscription.status}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground">Free</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {user.subscription?.currentEnd
+                        ? formatDate(user.subscription.currentEnd)
+                        : "—"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {user.currentPlan.name === "pro" ? (
+                        <Badge variant="ghost">Already Pro</Badge>
+                      ) : (
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => handleUpgrade(user)}
+                          disabled={
+                            upgrade.isPending || upgradingUserId === user.id
+                          }
+                        >
+                          {upgradingUserId === user.id ? (
+                            <Spinner className="size-3.5" />
+                          ) : null}
+                          Upgrade to Pro
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

@@ -1,3 +1,4 @@
+import { adminRouter } from "@/server/api/routers/admin";
 import { agentRouter } from "@/server/api/routers/agent";
 import { billingRouter } from "@/server/api/routers/billing";
 import { calendarRouter } from "@/server/api/routers/calendar";
@@ -14,6 +15,7 @@ import { createCallerFactory, createTRPCRouter } from "@/server/api/trpc";
  */
 export const appRouter = createTRPCRouter({
   agent: agentRouter,
+  admin: adminRouter,
   calendar: calendarRouter,
   chat: chatRouter,
   billing: billingRouter,

@@ -21,7 +21,7 @@ function Command({
     <CommandPrimitive
       data-slot="command"
       className={cn(
-        "flex size-full flex-col overflow-hidden rounded-3xl bg-popover p-1 text-popover-foreground",
+        "flex flex-col overflow-hidden rounded-3xl bg-popover p-1 text-popover-foreground",
         className,
       )}
       {...props}
@@ -47,7 +47,7 @@ function CommandDialog({
     <Dialog {...props}>
       <DialogContent
         className={cn(
-          "top-1/3 translate-y-0 overflow-hidden rounded-3xl! p-0",
+          "top-1/3 flex max-h-[80vh] translate-y-0 flex-col overflow-hidden rounded-3xl! p-0",
           className,
         )}
         showCloseButton={showCloseButton}
@@ -95,7 +95,7 @@ function CommandList({
     <CommandPrimitive.List
       data-slot="command-list"
       className={cn(
-        "no-scrollbar max-h-72 scroll-py-1 overflow-x-hidden overflow-y-auto outline-none",
+        "flex-1 min-h-0 scroll-py-1 overflow-x-hidden overflow-y-auto outline-none",
         className,
       )}
       {...props}

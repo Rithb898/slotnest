@@ -22,6 +22,7 @@ honor its STOP conditions, and update your row when done.
 | 011  | Chat — the conversational AI agent (`/chat`) | P0 | L | 004, 005, 008, 009 | DONE (code complete for the confirmed slice: `/chat` persists conversation history and renders typed text/email-list/approval messages; the agent now uses curated read-only Gmail/Calendar tools, stored email IDs, and approval-gated outbound actions. Gates: focused static verification only; `build`/`dev` not run per repo instruction.) |
 | 012  | Settings, trust, and Razorpay billing | P1 | M | 001, 003, 010 | TODO |
 | 013  | One shared AI action budget across all model calls | P1 | L | 005, 009, 010, 011 | DONE (shared daily/monthly AI budget ledger + atomic reservation helper, billing summary exposure, server-side charging for agent/chat/draft/brief, UI lock states, focused budget test, and migration artifact added; `tsc --noEmit` still has unrelated baseline errors outside the touched slice) |
+| 014  | Admin-only settings tab for user search and manual subscription upgrades | P2 | M | 012, 013 | DONE (server-gated admin tab, bounded user search, manual Pro upgrade mutation, and focused verification complete) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
@@ -61,6 +62,9 @@ Suggested order: 004, then 006 (user, in parallel), then 005, 007, 008, 009.
 - 013 is the shared cost-control layer for the current AI entry points
   (`agent.ask`, `chat.send`, `gmail.draftReply`, `workspace.dailyBrief`); land
   it before any new model-powered surface is added.
+- 014 depends on the existing settings shell and billing summary shape. It is
+  intentionally hardcoded to a single server-side email and must remain hidden
+  from all other users.
 
 ## Findings considered and rejected
 

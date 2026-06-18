@@ -208,14 +208,10 @@ export function AppSidebar() {
         <div className="flex items-center gap-2 px-2 pt-2">
           <Link
             href="/today"
-            className="flex min-w-0 items-center gap-2 rounded-xl px-1.5 py-1 text-sm font-semibold tracking-tight"
+            aria-label="SlotNest home"
+            className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full"
           >
-            <Avatar className="size-7 rounded-xl">
-              <AvatarFallback className="rounded-xl bg-primary text-primary-foreground">
-                <SlotNestMark className="size-4 text-primary-foreground" />
-              </AvatarFallback>
-            </Avatar>
-            <span className="min-w-0 truncate">SlotNest</span>
+            <SlotNestMark className="size-full rounded-full object-cover" />
           </Link>
           <div className="ml-auto flex items-center gap-1">
             <SidebarTrigger />

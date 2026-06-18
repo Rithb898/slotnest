@@ -35,7 +35,6 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
-  CommandShortcut,
 } from "@/components/ui/command";
 import type { RouterOutputs } from "@/trpc/react";
 import { api } from "@/trpc/react";
@@ -59,16 +58,6 @@ type CommandBarContextValue = {
   open: boolean;
   setOpen: (open: boolean) => void;
   toggle: () => void;
-};
-
-/** `g`-prefixed jump targets — mirrors the hints shown in the bar + sidebar. */
-const GOTO: Record<string, Route> = {
-  t: "/today",
-  a: "/chat",
-  i: "/inbox",
-  c: "/calendar",
-  d: "/drafts",
-  w: "/waiting",
 };
 
 const CommandBarContext = createContext<CommandBarContextValue | null>(null);
@@ -140,11 +129,9 @@ export function CommandBar({ children }: { children?: React.ReactNode }) {
 
   const toggle = useCallback(() => setOpen((o) => !o), []);
 
-  // Global shortcuts: ⌘K opens the bar; `g` then t/i/c/d/w jumps to a surface
-  // (the chord the command bar advertises). Discoverable, never required —
-  // and skipped while typing in any field.
+  // Global shortcut: ⌘K opens the bar, and it stays inactive while typing in
+  // editable fields.
   useEffect(() => {
-    let gPressedAt = 0;
     function isEditable(el: EventTarget | null): boolean {
       if (!(el instanceof HTMLElement)) return false;
       const tag = el.tagName;
@@ -162,24 +149,10 @@ export function CommandBar({ children }: { children?: React.ReactNode }) {
         return;
       }
       if (e.metaKey || e.ctrlKey || e.altKey || isEditable(e.target)) return;
-
-      const key = e.key.toLowerCase();
-      if (key === "g") {
-        gPressedAt = Date.now();
-        return;
-      }
-      if (gPressedAt && Date.now() - gPressedAt < 1200 && key in GOTO) {
-        e.preventDefault();
-        gPressedAt = 0;
-        setOpen(false);
-        router.push(GOTO[key]);
-        return;
-      }
-      gPressedAt = 0;
     }
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [toggle, router]);
+  }, [toggle]);
 
   // Reset transient state whenever the bar closes.
   useEffect(() => {
@@ -322,7 +295,6 @@ export function CommandBar({ children }: { children?: React.ReactNode }) {
                 <span className="truncate">
                   {ask.isPending ? "Thinking…" : `Ask: "${trimmed}"`}
                 </span>
-                <CommandShortcut>↵</CommandShortcut>
               </CommandItem>
             </CommandGroup>
           ) : null}
@@ -458,32 +430,26 @@ export function CommandBar({ children }: { children?: React.ReactNode }) {
             <CommandItem onSelect={() => go("/today")}>
               <Sun />
               <span>Today</span>
-              <CommandShortcut>g t</CommandShortcut>
             </CommandItem>
             <CommandItem onSelect={() => go("/chat")}>
               <MessageSquare />
               <span>Chat</span>
-              <CommandShortcut>g a</CommandShortcut>
             </CommandItem>
             <CommandItem onSelect={() => go("/inbox")}>
               <Inbox />
               <span>Inbox</span>
-              <CommandShortcut>g i</CommandShortcut>
             </CommandItem>
             <CommandItem onSelect={() => go("/calendar")}>
               <CalendarDays />
               <span>Calendar</span>
-              <CommandShortcut>g c</CommandShortcut>
             </CommandItem>
             <CommandItem onSelect={() => go("/drafts")}>
               <PenLine />
               <span>Drafts</span>
-              <CommandShortcut>g d</CommandShortcut>
             </CommandItem>
             <CommandItem onSelect={() => go("/waiting")}>
               <Send />
               <span>Waiting</span>
-              <CommandShortcut>g w</CommandShortcut>
             </CommandItem>
             <CommandItem onSelect={() => go("/settings")}>
               <Plug />
@@ -500,13 +466,11 @@ export function CommandBar({ children }: { children?: React.ReactNode }) {
               >
                 <Sparkles />
                 <span className="truncate">Prepare approval proposal</span>
-                <CommandShortcut>↵</CommandShortcut>
               </CommandItem>
             ) : null}
             <CommandItem onSelect={() => go("/inbox")}>
               <PenLine />
               <span>Compose</span>
-              <CommandShortcut>c</CommandShortcut>
             </CommandItem>
           </CommandGroup>
         </CommandList>
