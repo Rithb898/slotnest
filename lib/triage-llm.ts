@@ -2,7 +2,7 @@ import { Agent, run } from "@openai/agents";
 import { z } from "zod";
 
 import { env } from "@/lib/config/env";
-import { TRIAGE_INSTRUCTIONS } from "@/lib/prompts";
+import { currentTimePromptContext, TRIAGE_INSTRUCTIONS } from "@/lib/prompts";
 import { type Triage, type TriageInput, triage } from "@/lib/triage";
 
 export const TRIAGE_LLM_MODEL = "gpt-4.1-mini";
@@ -66,6 +66,7 @@ export async function classifyTriage(
     const result = await run(
       agent,
       JSON.stringify({
+        currentTime: currentTimePromptContext(),
         subject: compactText(input.subject, 300),
         snippet: compactText(input.snippet, 600),
         body: compactText(input.body, 2500),

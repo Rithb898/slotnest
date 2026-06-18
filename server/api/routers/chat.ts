@@ -11,6 +11,7 @@ import { type GmailPayload, getHeader, parseAddress } from "@/lib/gmail";
 import {
   CHAT_AGENT_INSTRUCTIONS,
   VOICE_DRAFT_INSTRUCTIONS,
+  withCurrentTimeContext,
 } from "@/lib/prompts";
 import { toReplyReferences, toReplySubject } from "@/lib/reply";
 import { searchSentExemplars } from "@/lib/sent-embeddings";
@@ -190,7 +191,7 @@ ${styleBlock}
 
 Write the final reply body now.`;
 
-  const result = await run(agent, prompt);
+  const result = await run(agent, withCurrentTimeContext(prompt));
   return cleanBody(result.finalOutput ?? "") || proposal.body;
 }
 
@@ -464,7 +465,7 @@ export const chatRouter = createTRPCRouter({
       const agentInput = transcript
         ? `Conversation so far:\n${transcript}\n\nUser: ${input.prompt}`
         : input.prompt;
-      const result = await run(agent, agentInput);
+      const result = await run(agent, withCurrentTimeContext(agentInput));
       const output = result.finalOutput ?? {
         text: "(no response)",
         proposals: [],

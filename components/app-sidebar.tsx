@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Archive,
   CalendarDays,
   ChevronsUpDown,
   Inbox,
@@ -68,12 +69,13 @@ type NavItem = {
 
 const PRIMARY: NavItem[] = [
   { href: "/today", label: "Today", icon: Sun, shortcut: "G T" },
+  { href: "/chat", label: "Chat", icon: MessageSquare, shortcut: "G A" },
   { href: "/inbox", label: "Inbox", icon: Inbox, shortcut: "G I" },
   { href: "/calendar", label: "Calendar", icon: CalendarDays, shortcut: "G C" },
   { href: "/drafts", label: "Drafts", icon: PenLine, shortcut: "G D" },
   { href: "/waiting", label: "Waiting", icon: Send, shortcut: "G W" },
-  { href: "/chat", label: "Chat", icon: MessageSquare, shortcut: "G A" },
   { href: "/sent", label: "Sent", icon: MailCheck, shortcut: "G S" },
+  { href: "/archive" as Route, label: "Archive", icon: Archive },
 ];
 
 const SECONDARY: NavItem[] = [

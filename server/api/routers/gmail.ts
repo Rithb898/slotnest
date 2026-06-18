@@ -26,7 +26,10 @@ import {
   searchMessageEmbeddings,
   upsertMessageEmbedding,
 } from "@/lib/message-embeddings";
-import { DRAFT_REPLY_INSTRUCTIONS } from "@/lib/prompts";
+import {
+  DRAFT_REPLY_INSTRUCTIONS,
+  withCurrentTimeContext,
+} from "@/lib/prompts";
 import { upsertSentEmbedding } from "@/lib/sent-embeddings";
 import { type Triage, triage } from "@/lib/triage";
 import { classifyTriage } from "@/lib/triage-llm";
@@ -421,6 +424,99 @@ async function getCachedSentMessages({
   const filtered = rows
     .map((row) => normalizeGmailMessage(row.data, row.entity_id))
     .filter((message) => message.labelIds.includes("SENT"))
+    .filter((message) => messageMatchesQuery(message, q))
+    .sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0));
+
+  const page = filtered.slice(normalizedOffset, normalizedOffset + maxResults);
+  const nextOffset = normalizedOffset + maxResults;
+  return {
+    messages: page,
+    nextPageToken: filtered.length > nextOffset ? String(nextOffset) : null,
+  };
+}
+
+function isArchivedMessage(message: NormalizedGmailMessage): boolean {
+  const labels = new Set(message.labelIds);
+  return (
+    !labels.has("INBOX") &&
+    !labels.has("SENT") &&
+    !labels.has("DRAFT") &&
+    !labels.has("TRASH") &&
+    !labels.has("SPAM")
+  );
+}
+
+async function getLiveArchivedMessages({
+  tenant,
+  q,
+  maxResults,
+  pageToken,
+}: {
+  tenant: ReturnType<typeof corsair.withTenant>;
+  q?: string;
+  maxResults: number;
+  pageToken?: string;
+}) {
+  const archiveQuery = [
+    "-in:inbox",
+    "-in:sent",
+    "-in:drafts",
+    "-in:trash",
+    "-in:spam",
+    q,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const list = await tenant.gmail.api.messages.list({
+    maxResults,
+    q: archiveQuery,
+    pageToken,
+  });
+
+  const ids = (list.messages ?? [])
+    .map((m) => m.id)
+    .filter((id): id is string => Boolean(id));
+
+  const messages = (
+    await Promise.all(
+      ids.map(async (id) => {
+        const msg = await tenant.gmail.api.messages.get({
+          id,
+          format: "full",
+        });
+        return normalizeGmailMessage(msg as CachedGmailMessage, msg.id ?? id);
+      }),
+    )
+  ).filter(isArchivedMessage);
+
+  return {
+    messages,
+    nextPageToken: list.nextPageToken ?? null,
+  };
+}
+
+async function getCachedArchivedMessages({
+  tenant,
+  q,
+  maxResults,
+  pageToken,
+}: {
+  tenant: ReturnType<typeof corsair.withTenant>;
+  q?: string;
+  maxResults: number;
+  pageToken?: string;
+}) {
+  const offset = pageToken ? Number(pageToken) : 0;
+  const normalizedOffset = Number.isFinite(offset) && offset > 0 ? offset : 0;
+  const rows = await tenant.gmail.db.messages.list({
+    limit: Math.max(250, maxResults + normalizedOffset + 1),
+    offset: 0,
+  });
+
+  const filtered = rows
+    .map((row) => normalizeGmailMessage(row.data, row.entity_id))
+    .filter(isArchivedMessage)
     .filter((message) => messageMatchesQuery(message, q))
     .sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0));
 
@@ -1127,6 +1223,74 @@ export const gmailRouter = createTRPCRouter({
     }),
 
   /**
+   * Lists archived Gmail messages. In Gmail, archive means the message is no
+   * longer in INBOX; this page also excludes sent, draft, trash, and spam mail.
+   */
+  archived: protectedProcedure
+    .input(
+      z
+        .object({
+          q: z.string().optional(),
+          maxResults: z.number().min(1).max(50).optional(),
+          pageToken: z.string().optional(),
+          forceFresh: z.boolean().optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
+      if (!(await isGmailConnected(ctx.session.user.id))) {
+        return {
+          connected: false as const,
+          messages: [],
+          nextPageToken: null,
+        };
+      }
+
+      const tenant = corsair.withTenant(ctx.session.user.id);
+      const maxResults = input?.maxResults ?? 50;
+
+      const cached = input?.forceFresh
+        ? { messages: [], nextPageToken: null }
+        : await getCachedArchivedMessages({
+            tenant,
+            q: input?.q,
+            maxResults,
+            pageToken: input?.pageToken,
+          });
+
+      const source =
+        input?.pageToken || input?.forceFresh
+          ? await getLiveArchivedMessages({
+              tenant,
+              q: input?.q,
+              maxResults,
+              pageToken: input?.pageToken,
+            })
+          : cached.messages.length > 0
+            ? cached
+            : await getLiveArchivedMessages({
+                tenant,
+                q: input?.q,
+                maxResults,
+                pageToken: input?.pageToken,
+              });
+
+      return {
+        connected: true as const,
+        messages: source.messages.map((message) => ({
+          id: message.id,
+          threadId: message.threadId,
+          fromName: message.fromName,
+          fromEmail: message.fromEmail,
+          subject: message.subject,
+          snippet: message.snippet,
+          date: message.date,
+        })),
+        nextPageToken: source.nextPageToken,
+      };
+    }),
+
+  /**
    * Full message for the reading pane: headers + decoded body (html preferred,
    * plain-text fallback).
    */
@@ -1486,7 +1650,7 @@ Write the reply body now.`;
         model: DRAFT_MODEL,
       });
 
-      const result = await run(agent, prompt);
+      const result = await run(agent, withCurrentTimeContext(prompt));
       const text = cleanDraftText(result.finalOutput ?? "");
 
       // Persist for reuse. Overwrites a prior generated/forced draft for this id.

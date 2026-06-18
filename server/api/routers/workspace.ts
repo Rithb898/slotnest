@@ -4,7 +4,10 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { env } from "@/lib/config/env";
-import { DAILY_BRIEF_INSTRUCTIONS } from "@/lib/prompts";
+import {
+  DAILY_BRIEF_INSTRUCTIONS,
+  withCurrentTimeContext,
+} from "@/lib/prompts";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { reserveAiActionBudget } from "@/server/billing/ai-action-budget";
 import { db } from "@/server/db";
@@ -165,7 +168,9 @@ export const workspaceRouter = createTRPCRouter({
 
       const result = await run(
         agent,
-        `Daily workspace data:\n${JSON.stringify(input, null, 2)}\n\nWrite the brief.`,
+        withCurrentTimeContext(
+          `Daily workspace data:\n${JSON.stringify(input, null, 2)}\n\nWrite the brief.`,
+        ),
       );
       const brief = cleanBrief(result.finalOutput ?? "") || fallback;
 

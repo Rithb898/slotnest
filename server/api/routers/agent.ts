@@ -3,7 +3,7 @@ import { Agent, run, tool } from "@openai/agents";
 import { z } from "zod";
 import { env } from "@/lib/config/env";
 import { parseAddress } from "@/lib/gmail";
-import { AGENT_ASK_INSTRUCTIONS } from "@/lib/prompts";
+import { AGENT_ASK_INSTRUCTIONS, withCurrentTimeContext } from "@/lib/prompts";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { reserveAiActionBudget } from "@/server/billing/ai-action-budget";
 import { corsair } from "@/server/corsair";
@@ -169,7 +169,7 @@ export const agentRouter = createTRPCRouter({
         model: "gpt-4.1-mini",
       });
 
-      const result = await run(agent, input.prompt);
+      const result = await run(agent, withCurrentTimeContext(input.prompt));
       const output = result.finalOutput ?? {
         text: "(no response)",
         proposals: [],

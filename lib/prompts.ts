@@ -7,6 +7,28 @@
  * runtime data) stay next to the code that assembles them.
  */
 
+export function currentTimePromptContext(now = new Date()): string {
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const localTime = new Intl.DateTimeFormat("en", {
+    dateStyle: "full",
+    timeStyle: "long",
+    timeZone,
+  }).format(now);
+
+  return `Current time:
+- ISO: ${now.toISOString()}
+- Local: ${localTime}
+- Time zone: ${timeZone}`;
+}
+
+export function withCurrentTimeContext(
+  prompt: string,
+  now = new Date(),
+): string {
+  const currentTime = currentTimePromptContext(now);
+  return `${currentTime}\n\n${prompt}`;
+}
+
 /** ⌘K one-shot agent (`server/api/routers/agent.ts`). */
 export const AGENT_ASK_INSTRUCTIONS = `You are SlotNest's assistant for a Gmail + Google Calendar workspace.
 You have Corsair tools: use list_operations to discover APIs, get_schema to learn arguments, and run_script to read data.
