@@ -34,7 +34,7 @@ export function HowItWorks() {
       <Reveal className="max-w-2xl">
         <SectionHeading>
           From cluttered to clear in{" "}
-          <em className="font-serif font-normal italic text-honey-ink">
+          <em className="font-serif font-normal italic text-primary">
             four steps.
           </em>
         </SectionHeading>
@@ -45,10 +45,10 @@ export function HowItWorks() {
           <Reveal as="li" key={s.title} delay={i * 80}>
             <div className="flex h-full flex-col rounded-2xl border border-border bg-card p-5 transition-transform duration-300 hover:-translate-y-1 hover:shadow-[0_20px_50px_-28px_rgba(0,0,0,0.35)]">
               <div className="flex items-center justify-between">
-                <span className="grid size-10 place-items-center rounded-xl bg-primary/15 text-honey-ink">
+                <span className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary">
                   <s.icon className="size-5" />
                 </span>
-                <span className="font-serif text-[1.6rem] italic text-border">
+                <span className="font-serif text-[1.6rem] italic text-border/70">
                   0{i + 1}
                 </span>
               </div>

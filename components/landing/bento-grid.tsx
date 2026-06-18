@@ -28,7 +28,7 @@ export function BentoGrid() {
           <Card className="md:col-span-2">
             <CardHead title="Triage overview" />
             <div className="mt-4 flex items-baseline justify-between">
-              <span className="text-[2.6rem] font-bold leading-none text-[#2c2c2c]">
+              <span className="text-[2.6rem] font-bold leading-none text-foreground">
                 87%
               </span>
               <Tag tone="good">Healthy</Tag>
@@ -44,7 +44,7 @@ export function BentoGrid() {
                 <span className="text-lg font-bold text-[#2c2c2c]">52%</span>
               </div>
               <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-secondary">
-                <div className="h-full bg-[#d99a3c]" style={{ width: "52%" }} />
+                <div className="h-full bg-primary" style={{ width: "52%" }} />
               </div>
             </div>
           </Card>
@@ -61,7 +61,9 @@ export function BentoGrid() {
                   style={{
                     height: `${h}px`,
                     background:
-                      i === 3 ? "#4c9b6b" : "var(--color-secondary, #e7e5df)",
+                      i === 3
+                        ? "var(--color-primary)"
+                        : "var(--color-secondary, #e7e5df)",
                   }}
                 />
               ))}
@@ -70,7 +72,7 @@ export function BentoGrid() {
               {["PN", "MB", "FG", "ST", "+9"].map((a) => (
                 <span
                   key={a}
-                  className="grid size-7 place-items-center rounded-full border border-white bg-secondary text-[0.62rem] font-bold text-muted-foreground shadow-sm"
+                  className="grid size-7 place-items-center rounded-full border border-border bg-secondary text-[0.62rem] font-bold text-muted-foreground shadow-sm"
                 >
                   {a}
                 </span>
@@ -148,7 +150,7 @@ export function BentoGrid() {
                     {r.d}
                   </span>
                   <span className="flex-1 text-foreground/90">{r.l}</span>
-                  <span className="font-bold text-[#2c2c2c]">{r.v}</span>
+                  <span className="font-bold text-foreground">{r.v}</span>
                   <Tag tone={r.t}>{r.t === "good" ? "GOOD" : "ATTN"}</Tag>
                 </div>
               ))}
@@ -165,7 +167,7 @@ export function BentoGrid() {
                 { icon: Calendar, label: "Schedule" },
               ].map((n) => (
                 <div key={n.label} className="flex flex-col items-center gap-2">
-                  <span className="grid size-11 place-items-center rounded-full bg-[#4c9b6b]/12 text-[#4c9b6b]">
+                  <span className="grid size-11 place-items-center rounded-full bg-primary/10 text-primary">
                     <n.icon className="size-5" />
                   </span>
                   <span className="text-[0.66rem] font-semibold text-muted-foreground">
@@ -203,7 +205,7 @@ function Card({
 function CardHead({ title }: { title: string }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-[0.8rem] font-semibold text-[#2c2c2c]">
+      <span className="text-[0.8rem] font-semibold text-foreground">
         {title}
       </span>
       <TrendingUp className="size-3.5 text-muted-foreground" />
@@ -222,8 +224,8 @@ function Tag({
     <span
       className={`rounded px-1.5 py-0.5 text-[0.56rem] font-bold ${
         tone === "good"
-          ? "bg-[#4c9b6b]/15 text-[#4c9b6b]"
-          : "bg-[#d99a3c]/15 text-[#d99a3c]"
+          ? "bg-primary/10 text-primary"
+          : "bg-muted text-muted-foreground"
       }`}
     >
       {children}

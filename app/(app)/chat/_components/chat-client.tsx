@@ -1,15 +1,19 @@
 "use client";
 
 import {
+  CalendarDays,
   CalendarPlus,
   CheckCircle2,
   History,
   Loader2,
   Mail,
   MessageSquarePlus,
+  PanelRightOpen,
+  Plug,
   Send,
   Sparkles,
 } from "lucide-react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -30,12 +34,12 @@ import type { RouterOutputs } from "@/trpc/react";
 import { api } from "@/trpc/react";
 
 /**
- * Chat (plan 011) — the conversational front door to the Agent.
+ * Chat (plan 011): the conversational front door to the Agent.
  *
  * The agent is read-only server-side (ADR 0001): it shows its work as typed
- * messages (text · email_list · approval) and ends outbound actions in an
+ * messages (text, email_list, approval) and ends outbound actions in an
  * approval card. The actual send/book runs through the existing deterministic
- * dialogs (ReplyDialog / InviteDialog) on a human keypress — never the agent.
+ * dialogs (ReplyDialog / InviteDialog) on a human keypress, never the agent.
  */
 
 type ChatMessage = RouterOutputs["chat"]["send"]["messages"][number];
@@ -98,6 +102,11 @@ export function ChatClient() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const conversations = api.chat.conversations.useQuery();
   const markApprovalSent = api.chat.markApprovalSent.useMutation();
+  const connections = api.connections.list.useQuery();
+  const gmailConnected = connections.data?.includes("gmail") ?? false;
+  const calendarConnected =
+    connections.data?.includes("googlecalendar") ?? false;
+  const hasAnyConnection = gmailConnected || calendarConnected;
 
   const history = api.chat.messages.useQuery(
     { conversationId: conversationId ?? "" },
@@ -122,7 +131,12 @@ export function ChatClient() {
 
   function submit(prompt: string) {
     const trimmed = prompt.trim();
-    if (!trimmed || send.isPending) return;
+    if (!trimmed || send.isPending || !hasAnyConnection) {
+      if (!hasAnyConnection) {
+        toast.error("Connect Gmail or Calendar first.");
+      }
+      return;
+    }
     setInput("");
     const optimisticId = `optimistic-${Date.now()}`;
     // Optimistic user bubble; the canonical row arrives with the response.
@@ -225,96 +239,170 @@ export function ChatClient() {
   }
 
   const isEmpty = messages.length === 0 && !send.isPending;
+  const chatLocked = connections.isSuccess && !hasAnyConnection;
+  const disconnected = chatLocked;
+  const missingGmail = connections.isSuccess && !gmailConnected;
+  const missingCalendar = connections.isSuccess && !calendarConnected;
 
   return (
-    <div className="mx-auto flex h-full max-w-2xl flex-col">
-      <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
-        <div className="min-w-0">
-          <h1 className="truncate text-sm font-semibold">Ask SlotNest</h1>
-          <p className="truncate text-xs text-muted-foreground">
-            {conversationId ? "Saved chat" : "New chat"}
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button type="button" variant="outline" size="sm">
-                  <History className="size-4" />
-                  History
-                </Button>
-              }
-            />
-            <DropdownMenuContent align="end" className="w-72">
-              <DropdownMenuGroup>
-                <DropdownMenuLabel>Chat history</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {conversations.isLoading ? (
-                  <DropdownMenuItem disabled>
-                    <Loader2 className="size-4 animate-spin" />
-                    Loading chats
-                  </DropdownMenuItem>
-                ) : conversations.data && conversations.data.length > 0 ? (
-                  conversations.data.map((conversation) => (
-                    <DropdownMenuItem
-                      key={conversation.id}
-                      onClick={() => openConversation(conversation.id)}
-                      className={cn(
-                        "items-start",
-                        conversation.id === conversationId && "bg-accent",
-                      )}
-                    >
-                      <MessageSquarePlus className="mt-0.5 size-4" />
-                      <span className="min-w-0">
-                        <span className="block truncate">
-                          {conversation.title || "Untitled chat"}
-                        </span>
-                        <span className="block text-xs text-muted-foreground">
-                          {formatHistoryDate(conversation.updatedAt)}
-                        </span>
-                      </span>
-                    </DropdownMenuItem>
-                  ))
-                ) : (
-                  <DropdownMenuItem disabled>No saved chats</DropdownMenuItem>
-                )}
-              </DropdownMenuGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button type="button" variant="secondary" size="sm" onClick={newChat}>
-            <MessageSquarePlus className="size-4" />
-            New
-          </Button>
-        </div>
-      </header>
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6">
-        {isEmpty ? (
-          <div className="flex h-full flex-col items-center justify-center gap-6 text-center">
-            <div className="flex flex-col items-center gap-2">
-              <span className="flex size-11 items-center justify-center rounded-xl bg-primary/15 text-honey-ink">
-                <Sparkles className="size-5" />
-              </span>
-              <h1 className="text-lg font-semibold">Ask SlotNest</h1>
-              <p className="max-w-sm text-sm text-muted-foreground">
-                Find emails, draft replies in your voice, and set up meetings —
-                in plain English. Nothing sends until you approve.
+    <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,color-mix(in_oklch,var(--primary),transparent_84%),transparent_34rem),linear-gradient(180deg,color-mix(in_oklch,var(--muted),transparent_35%),transparent_18rem)]">
+      <header className="sticky top-0 z-10 border-b border-border/70 bg-background/85 px-3 py-3 backdrop-blur-xl sm:px-5">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="hidden size-10 shrink-0 items-center justify-center rounded-2xl border border-border/70 bg-card text-honey-ink shadow-sm sm:flex">
+              <Sparkles className="size-4" />
+            </span>
+            <div className="min-w-0">
+              <h1 className="truncate text-base font-semibold leading-tight">
+                Ask SlotNest
+              </h1>
+              <p className="truncate text-xs text-muted-foreground">
+                {chatLocked
+                  ? "Connect Gmail or Calendar to start chatting"
+                  : conversationId
+                    ? "Saved workspace chat"
+                    : "New workspace chat"}
               </p>
             </div>
-            <div className="flex flex-wrap justify-center gap-2">
-              {SUGGESTIONS.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => submit(s)}
-                  className="rounded-full border border-border bg-muted/40 px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-accent"
-                >
-                  {s}
-                </button>
-              ))}
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="bg-background/70 shadow-sm"
+                  >
+                    <History className="size-4" />
+                    History
+                  </Button>
+                }
+              />
+              <DropdownMenuContent align="end" className="w-80">
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>Chat history</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {conversations.isLoading ? (
+                    <DropdownMenuItem disabled>
+                      <Loader2 className="size-4 animate-spin" />
+                      Loading chats
+                    </DropdownMenuItem>
+                  ) : conversations.data && conversations.data.length > 0 ? (
+                    conversations.data.map((conversation) => (
+                      <DropdownMenuItem
+                        key={conversation.id}
+                        onClick={() => openConversation(conversation.id)}
+                        className={cn(
+                          "items-start gap-3 rounded-xl",
+                          conversation.id === conversationId && "bg-accent",
+                        )}
+                      >
+                        <MessageSquarePlus className="mt-0.5 size-4" />
+                        <span className="min-w-0">
+                          <span className="block truncate">
+                            {conversation.title || "Untitled chat"}
+                          </span>
+                          <span className="block text-xs text-muted-foreground">
+                            {formatHistoryDate(conversation.updatedAt)}
+                          </span>
+                        </span>
+                      </DropdownMenuItem>
+                    ))
+                  ) : (
+                    <DropdownMenuItem disabled>No saved chats</DropdownMenuItem>
+                  )}
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={newChat}
+              disabled={chatLocked}
+              className="shadow-sm"
+            >
+              <MessageSquarePlus className="size-4" />
+              New
+            </Button>
+          </div>
+        </div>
+      </header>
+      <div
+        ref={scrollRef}
+        className="min-h-0 flex-1 overflow-y-auto px-3 py-6 sm:px-5"
+      >
+        {disconnected ? (
+          <DisconnectedState />
+        ) : isEmpty ? (
+          <div className="mx-auto flex h-full max-w-5xl items-center justify-center py-8">
+            <div className="grid w-full gap-4 rounded-3xl border border-border/70 bg-card/75 p-4 shadow-[0_24px_80px_color-mix(in_oklch,var(--foreground),transparent_92%)] backdrop-blur-xl sm:p-6 lg:grid-cols-[1.08fr_0.92fr]">
+              <div className="flex min-h-80 flex-col justify-between rounded-2xl border border-border/70 bg-background/70 p-6">
+                <div className="space-y-4">
+                  <span className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm">
+                    <Sparkles className="size-5" />
+                  </span>
+                  <div className="space-y-3">
+                    <h2 className="max-w-xl text-2xl font-semibold leading-tight sm:text-3xl">
+                      Ask for mail, meetings, and follow-ups in one place.
+                    </h2>
+                    <p className="max-w-lg text-sm leading-6 text-muted-foreground">
+                      SlotNest reads your workspace, drafts the next step, and
+                      waits for your approval before sending or booking.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-8 grid gap-2 sm:grid-cols-3">
+                  <div className="rounded-2xl bg-muted/55 p-3">
+                    <Mail className="mb-3 size-4 text-honey-ink" />
+                    <p className="text-sm font-medium">Find mail</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      Pull up the threads that need attention.
+                    </p>
+                  </div>
+                  <div className="rounded-2xl bg-muted/55 p-3">
+                    <Send className="mb-3 size-4 text-honey-ink" />
+                    <p className="text-sm font-medium">Draft replies</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      Review every message before it goes out.
+                    </p>
+                  </div>
+                  <div className="rounded-2xl bg-muted/55 p-3">
+                    <CalendarPlus className="mb-3 size-4 text-honey-ink" />
+                    <p className="text-sm font-medium">Plan time</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      Turn availability into clear invites.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-col justify-between gap-4 rounded-2xl bg-primary/10 p-4">
+                <div>
+                  <p className="text-sm font-medium">Try a starting point</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    These are safe prompts. The final action still needs review.
+                  </p>
+                </div>
+                <div className="grid gap-2">
+                  {SUGGESTIONS.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => submit(s)}
+                      className="group flex items-center justify-between gap-3 rounded-2xl border border-border/70 bg-background/80 px-4 py-3 text-left text-sm font-medium shadow-sm transition-all hover:-translate-y-0.5 hover:bg-background active:translate-y-px"
+                    >
+                      <span>{s}</span>
+                      <PanelRightOpen className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-4">
+          <div className="mx-auto flex max-w-4xl flex-col gap-5 pb-4">
             {messages.map((message) => (
               <MessageRow
                 key={message.id}
@@ -324,46 +412,83 @@ export function ChatClient() {
               />
             ))}
             {send.isPending ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="size-4 animate-spin" />
-                Thinking…
+              <div className="flex items-center gap-3 pl-1 text-sm text-muted-foreground">
+                <span className="flex size-9 items-center justify-center rounded-2xl border border-border/70 bg-card shadow-sm">
+                  <Loader2 className="size-4 animate-spin" />
+                </span>
+                Thinking...
               </div>
             ) : null}
           </div>
         )}
       </div>
 
-      <div className="border-t border-border p-4">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            submit(input);
-          }}
-          className="flex items-end gap-2"
-        >
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                submit(input);
-              }
+      <div className="border-t border-border/70 bg-background/90 px-3 py-3 backdrop-blur-xl sm:px-5">
+        <div className="mx-auto max-w-4xl">
+          {connections.isSuccess &&
+          hasAnyConnection &&
+          (!gmailConnected || !calendarConnected) ? (
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-border/70 bg-card px-4 py-3 shadow-sm">
+              <div className="min-w-0">
+                <p className="text-sm font-medium">
+                  Chat works best when connected
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {missingGmail && missingCalendar
+                    ? "Connect Gmail and Calendar to let SlotNest read, draft, and schedule."
+                    : missingGmail
+                      ? "Connect Gmail to let SlotNest read mail and draft replies."
+                      : "Connect Calendar to let SlotNest find free slots and schedule meetings."}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <Link
+                  href="/settings?tab=connections"
+                  className="inline-flex items-center gap-2 rounded-2xl border border-border bg-background px-3 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-accent"
+                >
+                  <Plug className="size-4" />
+                  Open connections
+                </Link>
+              </div>
+            </div>
+          ) : null}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              submit(input);
             }}
-            rows={1}
-            placeholder="Ask SlotNest to find, draft, or schedule…"
-            className="max-h-40 min-h-10 flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-          />
-          <Button
-            type="submit"
-            variant="secondary"
-            size="icon"
-            disabled={!input.trim() || send.isPending}
-            aria-label="Send"
+            className="mx-auto flex max-w-4xl items-end gap-2 rounded-3xl border border-border/80 bg-card p-2 shadow-[0_18px_60px_color-mix(in_oklch,var(--foreground),transparent_93%)]"
           >
-            <Send className="size-4" />
-          </Button>
-        </form>
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  submit(input);
+                }
+              }}
+              rows={1}
+              placeholder={
+                hasAnyConnection
+                  ? "Ask SlotNest to find, draft, or schedule..."
+                  : "Connect Gmail or Calendar to start chatting..."
+              }
+              disabled={!hasAnyConnection || send.isPending}
+              className="max-h-40 min-h-11 flex-1 resize-none rounded-2xl border-0 bg-transparent px-3 py-3 text-sm leading-5 outline-none placeholder:text-muted-foreground/70 focus-visible:ring-0 disabled:cursor-not-allowed"
+            />
+            <Button
+              type="submit"
+              variant="default"
+              size="icon-lg"
+              disabled={!input.trim() || send.isPending || !hasAnyConnection}
+              aria-label="Send"
+              className="rounded-2xl shadow-sm"
+            >
+              <Send className="size-4" />
+            </Button>
+          </form>
+        </div>
       </div>
 
       <InviteDialog
@@ -381,6 +506,76 @@ export function ChatClient() {
   );
 }
 
+function DisconnectedState() {
+  return (
+    <div className="mx-auto flex h-full max-w-5xl items-center justify-center py-8">
+      <div className="grid w-full gap-4 rounded-3xl border border-border/70 bg-card/75 p-4 shadow-[0_24px_80px_color-mix(in_oklch,var(--foreground),transparent_92%)] backdrop-blur-xl sm:p-6 lg:grid-cols-[1.08fr_0.92fr]">
+        <div className="flex min-h-80 flex-col justify-between rounded-2xl border border-border/70 bg-background/70 p-6">
+          <div className="space-y-4">
+            <span className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm">
+              <Sparkles className="size-5" />
+            </span>
+            <div className="space-y-3">
+              <h2 className="max-w-xl text-2xl font-semibold leading-tight sm:text-3xl">
+                Connect Gmail or Calendar to start chatting.
+              </h2>
+              <p className="max-w-lg text-sm leading-6 text-muted-foreground">
+                SlotNest only chats when it has something real to read. Once
+                connected, it can find mail, draft replies, and propose meeting
+                times with approval steps.
+              </p>
+            </div>
+          </div>
+          <div className="mt-8 grid gap-2 sm:grid-cols-3">
+            <div className="rounded-2xl bg-muted/55 p-3">
+              <Mail className="mb-3 size-4 text-honey-ink" />
+              <p className="text-sm font-medium">Gmail</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                Read threads and draft replies.
+              </p>
+            </div>
+            <div className="rounded-2xl bg-muted/55 p-3">
+              <CalendarDays className="mb-3 size-4 text-honey-ink" />
+              <p className="text-sm font-medium">Calendar</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                Find open slots and propose invites.
+              </p>
+            </div>
+            <div className="rounded-2xl bg-muted/55 p-3">
+              <Plug className="mb-3 size-4 text-honey-ink" />
+              <p className="text-sm font-medium">Connections</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                Connect from Settings to unlock chat.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-col justify-between gap-4 rounded-2xl bg-primary/10 p-4">
+          <div>
+            <p className="text-sm font-medium">Connect first</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Chat is gated until SlotNest can read Gmail or Calendar.
+            </p>
+          </div>
+          <div className="grid gap-2">
+            <Link
+              href="/settings?tab=connections"
+              className="group flex items-center justify-between gap-3 rounded-2xl border border-border/70 bg-background/80 px-4 py-3 text-left text-sm font-medium shadow-sm transition-all hover:-translate-y-0.5 hover:bg-background active:translate-y-px"
+            >
+              <span>Go to Settings</span>
+              <PanelRightOpen className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+            </Link>
+            <p className="px-1 text-xs text-muted-foreground">
+              If you already connected one provider, you can still chat with the
+              available surface.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MessageRow({
   message,
   onApprove,
@@ -393,61 +588,90 @@ function MessageRow({
   if (message.type === "text") {
     const isUser = message.role === "user";
     return (
-      <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
+      <div
+        className={cn(
+          "flex items-start gap-3",
+          isUser ? "justify-end" : "justify-start",
+        )}
+      >
+        {!isUser ? (
+          <span className="mt-1 flex size-9 shrink-0 items-center justify-center rounded-2xl border border-border/70 bg-card text-honey-ink shadow-sm">
+            <Sparkles className="size-4" />
+          </span>
+        ) : null}
         <div
           className={cn(
-            "max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm",
+            "max-w-[86%] whitespace-pre-wrap px-4 py-3 text-sm leading-6 shadow-sm",
             isUser
-              ? "bg-primary/15 text-foreground"
-              : "bg-muted/60 text-foreground",
+              ? "rounded-[1.35rem] rounded-tr-md bg-primary text-primary-foreground"
+              : "rounded-[1.35rem] rounded-tl-md border border-border/70 bg-card text-foreground",
           )}
         >
           {message.content.text}
         </div>
+        {isUser ? (
+          <span className="mt-1 flex size-9 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-xs font-semibold text-honey-ink">
+            You
+          </span>
+        ) : null}
       </div>
     );
   }
 
   if (message.type === "email_list") {
     return (
-      <div className="rounded-xl border border-border bg-card">
-        <div className="flex items-center gap-2 border-b border-border px-3 py-2 text-xs font-medium text-muted-foreground">
-          <Mail className="size-3.5" />
-          {message.content.emails.length} email
-          {message.content.emails.length === 1 ? "" : "s"}
+      <div className="flex items-start gap-3">
+        <span className="mt-1 flex size-9 shrink-0 items-center justify-center rounded-2xl border border-border/70 bg-card text-honey-ink shadow-sm">
+          <Mail className="size-4" />
+        </span>
+        <div className="min-w-0 flex-1 overflow-hidden rounded-3xl border border-border/70 bg-card shadow-sm">
+          <div className="flex items-center justify-between gap-3 border-b border-border/70 px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold">Mail found</p>
+              <p className="text-xs text-muted-foreground">
+                {message.content.emails.length} email
+                {message.content.emails.length === 1 ? "" : "s"} ready for
+                review
+              </p>
+            </div>
+          </div>
+          <ul className="divide-y divide-border/70">
+            {message.content.emails.map((email, index) => (
+              <li key={email.id}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    onPickEmail(
+                      `Reply to the email from ${email.fromName || email.fromEmail} about "${email.subject}"`,
+                    )
+                  }
+                  className="group flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/45"
+                >
+                  <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs tabular-nums text-muted-foreground">
+                    {index + 1}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center justify-between gap-3">
+                      <span className="truncate text-sm font-medium">
+                        {email.subject}
+                      </span>
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {formatDate(email.date)}
+                      </span>
+                    </span>
+                    <span className="mt-1 block truncate text-xs text-muted-foreground">
+                      {email.fromName || email.fromEmail}
+                    </span>
+                    <span className="mt-1 block truncate text-sm text-muted-foreground">
+                      {email.snippet}
+                    </span>
+                  </span>
+                  <PanelRightOpen className="mt-1 size-4 shrink-0 text-muted-foreground opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100" />
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
-        <ul className="divide-y divide-border">
-          {message.content.emails.map((email, index) => (
-            <li key={email.id}>
-              <button
-                type="button"
-                onClick={() =>
-                  onPickEmail(
-                    `Reply to the email from ${email.fromName || email.fromEmail} about "${email.subject}"`,
-                  )
-                }
-                className="flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors hover:bg-accent"
-              >
-                <span className="mt-0.5 w-4 shrink-0 text-xs tabular-nums text-muted-foreground">
-                  {index + 1}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center justify-between gap-2">
-                    <span className="truncate text-sm font-medium">
-                      {email.subject}
-                    </span>
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {formatDate(email.date)}
-                    </span>
-                  </span>
-                  <span className="block truncate text-xs text-muted-foreground">
-                    {email.fromName || email.fromEmail} — {email.snippet}
-                  </span>
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
       </div>
     );
   }
@@ -456,55 +680,89 @@ function MessageRow({
   const proposal = message.content.proposal;
   const sent = message.content.status === "sent";
   return (
-    <div className="rounded-xl border border-border bg-muted/40 p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 space-y-1">
-          <div className="flex items-center gap-2 text-sm font-medium">
+    <div className="flex items-start gap-3">
+      <span
+        className={cn(
+          "mt-1 flex size-9 shrink-0 items-center justify-center rounded-2xl border shadow-sm",
+          sent
+            ? "border-success/30 bg-success-subtle text-success"
+            : "border-border/70 bg-card text-honey-ink",
+        )}
+      >
+        {sent ? (
+          <CheckCircle2 className="size-4" />
+        ) : proposal.kind === "invite" ? (
+          <CalendarPlus className="size-4" />
+        ) : (
+          <Send className="size-4" />
+        )}
+      </span>
+      <div
+        className={cn(
+          "min-w-0 flex-1 rounded-3xl border p-4 shadow-sm",
+          sent
+            ? "border-success/25 bg-success-subtle/45"
+            : "border-border/70 bg-card",
+        )}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 space-y-2">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              {proposal.kind === "invite" ? (
+                <CalendarPlus className="size-4 text-muted-foreground" />
+              ) : (
+                <Mail className="size-4 text-muted-foreground" />
+              )}
+              <span className="truncate">
+                {proposal.kind === "invite"
+                  ? proposal.summary
+                  : proposal.subject}
+              </span>
+            </div>
             {proposal.kind === "invite" ? (
-              <CalendarPlus className="size-4 text-muted-foreground" />
+              <div className="space-y-1 text-xs text-muted-foreground">
+                <p>
+                  {formatDateTime(proposal.start)} -{" "}
+                  {formatDateTime(proposal.end)}
+                </p>
+                {proposal.attendees.length > 0 ? (
+                  <p className="truncate">{proposal.attendees.join(", ")}</p>
+                ) : null}
+              </div>
             ) : (
-              <Mail className="size-4 text-muted-foreground" />
+              <div className="space-y-2 text-sm">
+                <p className="truncate text-xs text-muted-foreground">
+                  To {proposal.to}
+                </p>
+                <p className="line-clamp-4 whitespace-pre-wrap leading-6 text-foreground/90">
+                  {proposal.body}
+                </p>
+                {sent ? (
+                  <p className="text-xs font-medium text-success">
+                    Sent to Gmail.
+                  </p>
+                ) : null}
+              </div>
             )}
-            <span className="truncate">
-              {proposal.kind === "invite" ? proposal.summary : proposal.subject}
-            </span>
           </div>
-          {proposal.kind === "invite" ? (
-            <div className="space-y-1 text-xs text-muted-foreground">
-              <p>
-                {formatDateTime(proposal.start)} -{" "}
-                {formatDateTime(proposal.end)}
-              </p>
-              {proposal.attendees.length > 0 ? (
-                <p className="truncate">{proposal.attendees.join(", ")}</p>
-              ) : null}
-            </div>
-          ) : (
-            <div className="space-y-1 text-xs text-muted-foreground">
-              <p className="truncate">To {proposal.to}</p>
-              <p className="line-clamp-3 whitespace-pre-wrap">
-                {proposal.body}
-              </p>
-              {sent ? <p>Sent to Gmail.</p> : null}
-            </div>
-          )}
+          <Button
+            type="button"
+            size="sm"
+            variant={sent ? "outline" : "secondary"}
+            disabled={sent}
+            onClick={() => onApprove(message)}
+            className="shrink-0"
+          >
+            {sent ? (
+              <CheckCircle2 className="size-4" />
+            ) : proposal.kind === "invite" ? (
+              <CalendarPlus className="size-4" />
+            ) : (
+              <Send className="size-4" />
+            )}
+            {sent ? "Sent" : "Review"}
+          </Button>
         </div>
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          disabled={sent}
-          onClick={() => onApprove(message)}
-        >
-          {sent ? (
-            <CheckCircle2 className="size-4" />
-          ) : proposal.kind === "invite" ? (
-            <CalendarPlus className="size-4" />
-          ) : (
-            <Send className="size-4" />
-          )}
-          {sent ? "Sent" : "Review"}
-        </Button>
       </div>
     </div>
   );

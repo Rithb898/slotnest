@@ -5,6 +5,7 @@ import {
   ChevronsUpDown,
   Inbox,
   LogOut,
+  MailCheck,
   MessageSquare,
   Plug,
   Search,
@@ -68,6 +69,7 @@ const PRIMARY: NavItem[] = [
   { href: "/today", label: "Today", icon: Sun, shortcut: "G T" },
   { href: "/chat", label: "Chat", icon: MessageSquare, shortcut: "G A" },
   { href: "/inbox", label: "Inbox", icon: Inbox, shortcut: "G I" },
+  { href: "/sent", label: "Sent", icon: MailCheck, shortcut: "G S" },
   { href: "/calendar", label: "Calendar", icon: CalendarDays, shortcut: "G C" },
   { href: "/waiting", label: "Waiting", icon: Send, shortcut: "G W" },
 ];

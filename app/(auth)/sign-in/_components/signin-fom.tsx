@@ -1,8 +1,10 @@
 "use client";
 import { useForm } from "@tanstack/react-form";
+import { Eye, EyeOff } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { toast } from "sonner";
 import z from "zod";
 import { Button } from "@/components/ui/button";
@@ -49,6 +51,7 @@ export function SignInForm({
   ...props
 }: React.ComponentProps<"div">) {
   const router = useRouter();
+  const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm({
     defaultValues: {
@@ -145,15 +148,33 @@ export function SignInForm({
                         Forgot your password?
                       </Link>
                     </div>
-                    <Input
-                      id={field.name}
-                      name={field.name}
-                      type="password"
-                      placeholder="••••••••"
-                      value={field.state.value}
-                      onBlur={field.handleBlur}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                    />
+                    <div className="relative">
+                      <Input
+                        id={field.name}
+                        name={field.name}
+                        type={showPassword ? "text" : "password"}
+                        placeholder="••••••••"
+                        className="pr-10"
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+                        aria-label={
+                          showPassword ? "Hide password" : "Show password"
+                        }
+                        aria-pressed={showPassword}
+                        onClick={() => setShowPassword((value) => !value)}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="size-4" />
+                        ) : (
+                          <Eye className="size-4" />
+                        )}
+                      </button>
+                    </div>
                     {field.state.meta.errors.length > 0 && (
                       <FieldError errors={field.state.meta.errors} />
                     )}
@@ -179,8 +200,8 @@ export function SignInForm({
       </Card>
       <FieldDescription className="px-6 text-center">
         By clicking continue, you agree to our{" "}
-        <Link href="#">Terms of Service</Link> and{" "}
-        <Link href="#">Privacy Policy</Link>.
+        <Link href="/terms-of-service">Terms of Service</Link> and{" "}
+        <Link href="/privacy-policy">Privacy Policy</Link>.
       </FieldDescription>
     </div>
   );

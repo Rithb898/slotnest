@@ -80,7 +80,7 @@ export function HeroNavbar() {
                 href="/sign-up"
                 className="sheen-host group inline-flex items-center gap-2 rounded-full bg-primary py-1.5 pr-1.5 pl-4 text-[13px] font-medium text-primary-foreground transition-[transform,opacity,box-shadow] duration-200 hover:-translate-y-0.5 hover:opacity-95 hover:shadow-[0_12px_30px_-18px_rgba(0,0,0,0.4)] sm:text-[14px]"
               >
-                <span className="hidden sm:inline">Get early access</span>
+                <span className="hidden sm:inline">Get started free</span>
                 <span className="sm:hidden">Early access</span>
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/20 transition-transform duration-200 group-hover:translate-x-0.5">
                   <ChevronRight className="h-4 w-4" strokeWidth={2} />

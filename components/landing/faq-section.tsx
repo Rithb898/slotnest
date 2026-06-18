@@ -11,7 +11,7 @@ export function FaqSection() {
       <Reveal className="mb-10 text-center">
         <SectionHeading>
           Frequently asked{" "}
-          <em className="font-serif font-normal italic text-honey-ink">
+          <em className="font-serif font-normal italic text-primary">
             questions.
           </em>
         </SectionHeading>

@@ -2,7 +2,7 @@ import { Reveal } from "@/components/landing/reveal";
 
 export function TypeMoment() {
   return (
-    <section className="relative overflow-hidden border-y border-border bg-[linear-gradient(180deg,theme(colors.secondary/55),theme(colors.background))] py-24 sm:py-32">
+    <section className="relative overflow-hidden border-y border-border bg-[linear-gradient(180deg,theme(colors.secondary/30),theme(colors.background))] py-24 sm:py-32">
       <div
         aria-hidden
         className="blob blob--b absolute left-1/2 top-1/2 size-112 -translate-x-1/2 -translate-y-1/2 opacity-30"
@@ -14,7 +14,7 @@ export function TypeMoment() {
           style={{ textWrap: "balance" }}
         >
           Email that gets{" "}
-          <em className="font-serif font-normal italic text-honey-ink">
+          <em className="font-serif font-normal italic text-primary">
             out of your way
           </em>{" "}
           — so the rest of your day doesn&apos;t have to wait on it.

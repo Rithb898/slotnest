@@ -28,7 +28,7 @@ export function CtaBand() {
             </span>
             <h2 className="mx-auto mt-5 max-w-2xl text-balance font-semibold text-[2.2rem] text-foreground leading-[1.08] tracking-[-0.03em] sm:text-[3rem]">
               A quieter inbox is{" "}
-              <em className="font-serif font-normal text-honey-ink italic">
+              <em className="font-serif font-normal text-primary italic">
                 a few keystrokes away.
               </em>
             </h2>

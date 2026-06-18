@@ -8,7 +8,7 @@ export function Showcase() {
       <Reveal className="mx-auto max-w-2xl text-center">
         <SectionHeading>
           Everything in{" "}
-          <em className="font-serif font-normal italic text-honey-ink">
+          <em className="font-serif font-normal italic text-primary">
             one quiet place.
           </em>
         </SectionHeading>
@@ -54,7 +54,7 @@ function InboxMockup() {
             <div
               key={row.t}
               className={`relative flex items-center gap-2 rounded-lg px-2.5 py-2 text-[0.82rem] font-medium ${
-                row.active ? "bg-card text-honey-ink" : "text-muted-foreground"
+                row.active ? "bg-card text-primary" : "text-muted-foreground"
               }`}
             >
               {row.active && (
@@ -139,7 +139,7 @@ function TriageRow({
   return (
     <div
       className={`relative flex items-center gap-3 rounded-xl px-3 py-2.5 transition-[transform,background-color] duration-300 group-hover:translate-x-0.5 ${
-        active ? "bg-[oklch(0.98_0.012_78)]" : "hover:bg-secondary/60"
+        active ? "bg-primary/5" : "hover:bg-secondary/60"
       }`}
     >
       {active && (
@@ -163,7 +163,7 @@ function TriageRow({
           {action === "scheduled" && <Chip variant="scheduled">Invite</Chip>}
         </div>
         <p className="truncate text-[0.82rem] text-muted-foreground">
-          <span className="text-foreground/80">{subject}</span> — {preview}
+          <span className="text-foreground/85">{subject}</span> — {preview}
         </p>
       </div>
       <time className="shrink-0 font-mono text-[0.74rem] text-muted-foreground">

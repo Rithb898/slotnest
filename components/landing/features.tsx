@@ -16,7 +16,7 @@ export function Features() {
           title={
             <>
               Know what matters{" "}
-              <em className="font-serif font-normal italic text-honey-ink">
+              <em className="font-serif font-normal italic text-primary">
                 at a glance.
               </em>
             </>
@@ -37,7 +37,7 @@ export function Features() {
           title={
             <>
               Replies, already{" "}
-              <em className="font-serif font-normal italic text-honey-ink">
+              <em className="font-serif font-normal italic text-primary">
                 written.
               </em>
             </>
@@ -57,7 +57,7 @@ export function Features() {
           title={
             <>
               Find time without the{" "}
-              <em className="font-serif font-normal italic text-honey-ink">
+              <em className="font-serif font-normal italic text-primary">
                 back-and-forth.
               </em>
             </>
@@ -105,7 +105,7 @@ function FeatureFold({
     <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
       <Reveal className={reverse ? "lg:order-2" : ""}>
         <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-[0.76rem] font-medium text-muted-foreground">
-          <Icon className="size-3.5 text-honey-ink" />
+          <Icon className="size-3.5 text-primary" />
           {kicker}
         </span>
         <h3 className="mt-5 text-[1.9rem] font-semibold leading-[1.1] tracking-[-0.025em] sm:text-[2.3rem]">
@@ -117,7 +117,7 @@ function FeatureFold({
         <ul className="mt-6 space-y-2.5">
           {points.map((p) => (
             <li key={p} className="flex items-start gap-2.5 text-[0.95rem]">
-              <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-primary/15 text-honey-ink">
+              <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
                 <Check className="size-3" strokeWidth={2.5} />
               </span>
               <span className="text-foreground/90">{p}</span>
@@ -187,9 +187,9 @@ function DraftPanel() {
   return (
     <Panel>
       <div className="flex items-center gap-2 border-b border-border pb-3 text-[0.8rem] text-muted-foreground">
-        <Reply className="size-3.5 text-honey-ink" />
+        <Reply className="size-3.5 text-primary" />
         Draft to <span className="font-medium text-foreground">Priya Nair</span>
-        <span className="ml-auto rounded-md bg-primary/15 px-2 py-0.5 text-[0.7rem] font-medium text-honey-ink">
+        <span className="ml-auto rounded-md bg-primary/10 px-2 py-0.5 text-[0.7rem] font-medium text-primary">
           in your voice
         </span>
       </div>
@@ -219,7 +219,7 @@ function SchedulePanel() {
   return (
     <Panel>
       <div className="flex items-center gap-2 border-b border-border pb-3 text-[0.8rem] text-muted-foreground">
-        <CalendarClock className="size-3.5 text-honey-ink" />
+        <CalendarClock className="size-3.5 text-primary" />
         Free slots with{" "}
         <span className="font-medium text-foreground">Marco</span>
         <span className="ml-auto font-mono text-[0.7rem]">30 min</span>
@@ -239,14 +239,14 @@ function SchedulePanel() {
             </div>
             <div className="mt-1 text-[0.86rem] font-semibold">{s.t}</div>
             {s.pick && (
-              <div className="mt-1.5 inline-flex items-center gap-1 text-[0.68rem] font-medium text-success">
+              <div className="mt-1.5 inline-flex items-center gap-1 text-[0.68rem] font-medium text-primary">
                 <Check className="size-3" /> picked
               </div>
             )}
           </div>
         ))}
       </div>
-      <div className="mt-3 flex items-center gap-2 rounded-lg bg-success-subtle/60 px-3 py-2 text-[0.8rem] text-success">
+      <div className="mt-3 flex items-center gap-2 rounded-lg bg-primary/10 px-3 py-2 text-[0.8rem] text-primary">
         <Check className="size-3.5" /> Invite sent for Thu 11:30 am
       </div>
     </Panel>

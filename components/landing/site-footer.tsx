@@ -5,7 +5,8 @@ const NAV = [
   { label: "Features", href: "#features" },
   { label: "How it works", href: "#how" },
   { label: "FAQ", href: "#faq" },
-  { label: "Sign in", href: "/sign-in" },
+  { label: "Privacy Policy", href: "/privacy-policy" },
+  { label: "Terms of Service", href: "/terms-of-service" },
 ];
 
 const SOCIAL = [
@@ -59,7 +60,7 @@ export function SiteFooter() {
       <div className="relative mx-auto w-full max-w-7xl px-5 sm:px-8">
         <div
           aria-hidden
-          className="pointer-events-none mb-[-0.18em] select-none whitespace-nowrap text-center font-serif font-bold leading-none tracking-tighter text-honey-ink/15"
+          className="pointer-events-none mb-[-0.18em] select-none whitespace-nowrap text-center font-serif font-bold leading-none tracking-tighter text-foreground/10"
           style={{ fontSize: "clamp(5rem, 23vw, 22rem)" }}
         >
           SlotNest
@@ -68,7 +69,15 @@ export function SiteFooter() {
 
       <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 pb-5 text-[0.78rem] text-muted-foreground sm:px-8">
         <span>© 2026 SlotNest</span>
-        <span>Built for a quieter inbox.</span>
+        <span className="flex flex-wrap items-center gap-4">
+          <span>Built for a quieter inbox.</span>
+          <a href="/privacy-policy" className="hover:text-foreground">
+            Privacy Policy
+          </a>
+          <a href="/terms-of-service" className="hover:text-foreground">
+            Terms of Service
+          </a>
+        </span>
       </div>
     </footer>
   );

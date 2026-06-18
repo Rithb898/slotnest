@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { OpenAIAgentsProvider } from "@corsair-dev/mcp";
 import { Agent, run, tool } from "@openai/agents";
+import { TRPCError } from "@trpc/server";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
@@ -21,7 +22,12 @@ import {
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { corsairReadonly } from "@/server/corsair";
 import { db } from "@/server/db";
-import { chatConversation, chatMessage } from "@/server/db/schema";
+import {
+  chatConversation,
+  chatMessage,
+  corsairAccounts,
+  corsairIntegrations,
+} from "@/server/db/schema";
 
 /**
  * Chat — the persistent conversational agent (plan 011, ADR 0001).
@@ -237,6 +243,19 @@ async function insertMessage(
   } as ChatMessagePayload;
 }
 
+async function getConnectionNames(userId: string): Promise<string[]> {
+  const rows = await db
+    .selectDistinct({ name: corsairIntegrations.name })
+    .from(corsairAccounts)
+    .innerJoin(
+      corsairIntegrations,
+      eq(corsairAccounts.integrationId, corsairIntegrations.id),
+    )
+    .where(eq(corsairAccounts.tenantId, userId));
+
+  return rows.map((row) => row.name);
+}
+
 export const chatRouter = createTRPCRouter({
   conversations: protectedProcedure.query(async ({ ctx }) => {
     return db
@@ -321,6 +340,13 @@ export const chatRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
+      const connections = await getConnectionNames(userId);
+      if (connections.length === 0) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Connect Gmail or Calendar before using Chat.",
+        });
+      }
 
       // Resolve (or create) the conversation, verifying ownership.
       let conversationId = input.conversationId ?? null;

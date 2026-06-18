@@ -340,6 +340,76 @@ async function getCachedInboxMessages({
   };
 }
 
+async function getLiveSentMessages({
+  tenant,
+  q,
+  maxResults,
+  pageToken,
+}: {
+  tenant: ReturnType<typeof corsair.withTenant>;
+  q?: string;
+  maxResults: number;
+  pageToken?: string;
+}) {
+  const list = await tenant.gmail.api.messages.list({
+    labelIds: ["SENT"],
+    maxResults,
+    q,
+    pageToken,
+  });
+
+  const ids = (list.messages ?? [])
+    .map((m) => m.id)
+    .filter((id): id is string => Boolean(id));
+
+  const messages = await Promise.all(
+    ids.map(async (id) => {
+      const msg = await tenant.gmail.api.messages.get({
+        id,
+        format: "full",
+      });
+      return normalizeGmailMessage(msg as CachedGmailMessage, msg.id ?? id);
+    }),
+  );
+
+  return {
+    messages,
+    nextPageToken: list.nextPageToken ?? null,
+  };
+}
+
+async function getCachedSentMessages({
+  tenant,
+  q,
+  maxResults,
+  pageToken,
+}: {
+  tenant: ReturnType<typeof corsair.withTenant>;
+  q?: string;
+  maxResults: number;
+  pageToken?: string;
+}) {
+  const offset = pageToken ? Number(pageToken) : 0;
+  const normalizedOffset = Number.isFinite(offset) && offset > 0 ? offset : 0;
+  const rows = await tenant.gmail.db.messages.list({
+    limit: Math.max(250, maxResults + normalizedOffset + 1),
+    offset: 0,
+  });
+
+  const filtered = rows
+    .map((row) => normalizeGmailMessage(row.data, row.entity_id))
+    .filter((message) => message.labelIds.includes("SENT"))
+    .filter((message) => messageMatchesQuery(message, q))
+    .sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0));
+
+  const page = filtered.slice(normalizedOffset, normalizedOffset + maxResults);
+  const nextOffset = normalizedOffset + maxResults;
+  return {
+    messages: page,
+    nextPageToken: filtered.length > nextOffset ? String(nextOffset) : null,
+  };
+}
+
 async function getCachedMessage(
   tenant: ReturnType<typeof corsair.withTenant>,
   id: string,
@@ -757,6 +827,68 @@ export const gmailRouter = createTRPCRouter({
       return {
         connected: true as const,
         messages,
+        nextPageToken: source.nextPageToken,
+      };
+    }),
+
+  /**
+   * Lists Gmail SENT messages for the sent-mail page. This intentionally stays
+   * read-only: Gmail remains the source of truth for what was actually sent.
+   */
+  sent: protectedProcedure
+    .input(
+      z
+        .object({
+          q: z.string().optional(),
+          maxResults: z.number().min(1).max(50).optional(),
+          pageToken: z.string().optional(),
+          forceFresh: z.boolean().optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
+      if (!(await isGmailConnected(ctx.session.user.id))) {
+        return {
+          connected: false as const,
+          messages: [],
+          nextPageToken: null,
+        };
+      }
+
+      const tenant = corsair.withTenant(ctx.session.user.id);
+      const maxResults = input?.maxResults ?? 50;
+
+      const cached = input?.forceFresh
+        ? { messages: [], nextPageToken: null }
+        : await getCachedSentMessages({
+            tenant,
+            q: input?.q,
+            maxResults,
+            pageToken: input?.pageToken,
+          });
+
+      const source =
+        cached.messages.length > 0 || input?.pageToken
+          ? cached
+          : await getLiveSentMessages({
+              tenant,
+              q: input?.q,
+              maxResults,
+              pageToken: input?.pageToken,
+            });
+
+      return {
+        connected: true as const,
+        messages: source.messages.map((message) => ({
+          id: message.id,
+          threadId: message.threadId,
+          to: message.to,
+          fromName: message.fromName,
+          fromEmail: message.fromEmail,
+          subject: message.subject,
+          snippet: message.snippet,
+          date: message.date,
+        })),
         nextPageToken: source.nextPageToken,
       };
     }),

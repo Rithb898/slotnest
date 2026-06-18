@@ -8,10 +8,10 @@ export function Chip({
   children: ReactNode;
 }) {
   const styles: Record<string, string> = {
-    urgent: "bg-destructive/12 text-destructive",
-    reply: "bg-primary/15 text-honey-ink",
-    fyi: "bg-info/15 text-info",
-    scheduled: "bg-success/15 text-success",
+    urgent: "bg-muted text-foreground",
+    reply: "bg-primary/10 text-primary",
+    fyi: "bg-secondary text-foreground/80",
+    scheduled: "bg-primary/10 text-primary",
   };
   return (
     <span

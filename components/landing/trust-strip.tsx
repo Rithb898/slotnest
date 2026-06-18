@@ -24,7 +24,7 @@ export function TrustStrip() {
               key={key}
               className="flex shrink-0 items-center gap-2 text-[0.85rem] font-medium text-muted-foreground"
             >
-              <Check className="size-3.5 text-honey-ink" />
+              <Check className="size-3.5 text-primary" />
               {t}
             </li>
           ))}
