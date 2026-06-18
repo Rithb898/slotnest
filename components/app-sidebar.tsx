@@ -59,6 +59,7 @@ import { cn } from "@/lib/utils";
 import { isWaitingMessage } from "@/lib/workspace";
 import { authClient } from "@/server/auth/client";
 import { api } from "@/trpc/react";
+import posthog from "posthog-js";
 
 type NavItem = {
   href: Route;
@@ -424,6 +425,12 @@ function AccountMenu({ health }: { health?: ConnHealth | null }) {
   const { state } = useSidebar();
   const { data: session } = authClient.useSession();
   const user = session?.user;
+
+  useEffect(() => {
+    if (user?.email) {
+      posthog.identify(user.email, { name: user.name, email: user.email });
+    }
+  }, [user?.email, user?.name]);
   const avatarUrl = user?.image ?? undefined;
   const needsConnect = !!health && health !== "ok";
 

@@ -55,6 +55,7 @@ import { cn } from "@/lib/utils";
 import { authClient } from "@/server/auth/client";
 import type { RouterOutputs } from "@/trpc/react";
 import { api } from "@/trpc/react";
+import posthog from "posthog-js";
 
 type SettingsTab = "connections" | "billing" | "trust" | "account" | "admin";
 type BillingSummary = RouterOutputs["billing"]["summary"];
@@ -190,6 +191,7 @@ function ConnectionsPanel({ connected }: { connected: string[] }) {
   const utils = api.useUtils();
   const disconnect = api.connections.disconnect.useMutation({
     onSuccess: async (_, variables) => {
+      posthog.capture("integration_disconnected", { provider: variables.provider });
       toast.success(`Disconnected ${labelFor(variables.provider)}`);
       await utils.connections.list.invalidate();
       router.refresh();

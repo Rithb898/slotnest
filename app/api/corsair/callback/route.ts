@@ -2,6 +2,8 @@ import { processOAuthCallback } from "corsair/oauth";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { env } from "@/lib/config/env";
+import { getPostHogClient } from "@/lib/posthog-server";
+import { getSession } from "@/server/auth/server";
 import { corsair } from "@/server/corsair";
 
 const REDIRECT_URI = `${env.APP_URL}/api/corsair/callback`;
@@ -54,6 +56,16 @@ export async function GET(request: NextRequest) {
       PLUGINS.includes(nextPlugin as (typeof PLUGINS)[number])
         ? nextPlugin
         : null;
+
+    const session = await getSession();
+    if (session?.user.id) {
+      const posthog = getPostHogClient();
+      posthog.capture({
+        distinctId: session.user.id,
+        event: "integration_connected",
+        properties: { provider: result.plugin, email: session.user.email },
+      });
+    }
 
     const res = NextResponse.redirect(
       chainNext

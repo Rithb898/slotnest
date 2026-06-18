@@ -33,6 +33,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { RouterOutputs } from "@/trpc/react";
 import { api } from "@/trpc/react";
+import posthog from "posthog-js";
 
 /**
  * Chat (plan 011): the conversational front door to the Agent.
@@ -153,6 +154,10 @@ export function ChatClient() {
       return;
     }
     setInput("");
+    posthog.capture("chat_message_sent", {
+      prompt_length: trimmed.length,
+      is_new_conversation: !conversationId,
+    });
     const optimisticId = `optimistic-${Date.now()}`;
     // Optimistic user bubble; the canonical row arrives with the response.
     setMessages((prev) => [
@@ -210,6 +215,7 @@ export function ChatClient() {
   function approve(message: Extract<ChatMessage, { type: "approval" }>) {
     const proposal = message.content.proposal;
     if (message.content.status === "sent") return;
+    posthog.capture("chat_ai_action_approved", { action_kind: proposal.kind });
     if (proposal.kind === "invite") {
       setActiveApprovalId(message.id);
       setInviteDraft({

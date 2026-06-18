@@ -29,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { authClient } from "@/server/auth/client";
+import posthog from "posthog-js";
 
 const formSchema = z
   .object({
@@ -92,6 +93,8 @@ export function SignupForm({
         },
         {
           onSuccess: () => {
+            posthog.identify(value.email, { name: value.name, email: value.email });
+            posthog.capture("user_signed_up", { method: "email", name: value.name, email: value.email });
             toast.success("Account created");
             router.push("/today");
           },

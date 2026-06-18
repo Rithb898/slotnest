@@ -22,6 +22,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { authClient } from "@/server/auth/client";
+import posthog from "posthog-js";
 
 const formSchema = z.object({
   email: z.email().describe("Enter your email address"),
@@ -48,6 +49,7 @@ export function ForgotPasswordForm({
         },
         {
           onSuccess: () => {
+            posthog.capture("password_reset_requested", { email: value.email });
             setSent(true);
           },
           onError: (ctx) => {

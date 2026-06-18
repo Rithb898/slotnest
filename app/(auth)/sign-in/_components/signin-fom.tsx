@@ -26,6 +26,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { authClient } from "@/server/auth/client";
+import posthog from "posthog-js";
 
 const formSchema = z.object({
   email: z.email().describe("Enter your email address"),
@@ -70,6 +71,8 @@ export function SignInForm({
         },
         {
           onSuccess: () => {
+            posthog.identify(value.email, { email: value.email });
+            posthog.capture("user_signed_in", { method: "email", email: value.email });
             toast.success("Signed in");
             router.push("/today");
           },

@@ -22,6 +22,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { api } from "@/trpc/react";
+import posthog from "posthog-js";
 
 export type ReplyDraft = {
   to: string;
@@ -69,6 +70,7 @@ export function ReplyDialog({
 
   const sendReply = api.gmail.sendReply.useMutation({
     onSuccess: () => {
+      posthog.capture("email_reply_sent", { type: "reply" });
       toast.success("Reply sent", {
         description: "Added to the Gmail thread.",
       });
@@ -87,6 +89,7 @@ export function ReplyDialog({
 
   const sendEmail = api.gmail.sendEmail.useMutation({
     onSuccess: () => {
+      posthog.capture("email_reply_sent", { type: "new_email" });
       toast.success("Email sent", {
         description: "Added to Gmail Sent.",
       });

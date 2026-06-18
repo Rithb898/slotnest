@@ -24,6 +24,7 @@ import { toReplyReferences, toReplySubject } from "@/lib/reply";
 import type { TriageAction } from "@/lib/triage";
 import { cn } from "@/lib/utils";
 import { api, type RouterOutputs } from "@/trpc/react";
+import posthog from "posthog-js";
 
 type SmartView = "needs-reply" | "schedule" | "fyi" | "all";
 type InboxMessage = RouterOutputs["gmail"]["inbox"]["messages"][number];
@@ -710,6 +711,10 @@ function ActionBar({
 
   const archive = api.gmail.archive.useMutation({
     onSuccess: () => {
+      posthog.capture("email_archived", {
+        is_thread: Boolean(message.threadId),
+        message_id: message.id,
+      });
       toast.success("Archived");
       void utils.gmail.inbox.invalidate();
       void utils.gmail.message.invalidate();

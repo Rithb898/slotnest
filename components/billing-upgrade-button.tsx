@@ -6,6 +6,7 @@ import type { ComponentProps, ReactNode } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { api } from "@/trpc/react";
+import posthog from "posthog-js";
 
 const RAZORPAY_CHECKOUT_SCRIPT = "https://checkout.razorpay.com/v1/checkout.js";
 
@@ -110,6 +111,8 @@ export function BillingUpgradeButton({
         throw new Error("Razorpay checkout did not initialize.");
       }
 
+      posthog.capture("billing_upgrade_initiated", { plan: result.planLabel });
+
       const checkout = new window.Razorpay({
         key: result.keyId,
         subscription_id: result.subscriptionId,
@@ -129,6 +132,7 @@ export function BillingUpgradeButton({
           void verifyCheckout
             .mutateAsync(response)
             .then(async () => {
+              posthog.capture("billing_upgrade_completed", { plan: result.planLabel });
               toast.success("Subscription verified.");
               await utils.billing.summary.invalidate();
               router.refresh();

@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/trpc/react";
+import posthog from "posthog-js";
 
 /**
  * Draft-then-approve event composer (plan 003 step 5).
@@ -220,6 +221,10 @@ export function InviteDialog({
   const createEvent = api.calendar.createEvent.useMutation({
     onSuccess: (res) => {
       const hasAttendees = attendeeList.length > 0;
+      posthog.capture("calendar_invite_sent", {
+        has_attendees: hasAttendees,
+        attendee_count: attendeeList.length,
+      });
       toast.success(hasAttendees ? "Invite sent" : "Event created", {
         description: "Added to your calendar.",
         action: res.htmlLink
