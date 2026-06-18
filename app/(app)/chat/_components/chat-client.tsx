@@ -279,7 +279,7 @@ export function ChatClient() {
   const missingCalendar = connections.isSuccess && !calendarConnected;
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,color-mix(in_oklch,var(--primary),transparent_84%),transparent_34rem),linear-gradient(180deg,color-mix(in_oklch,var(--muted),transparent_35%),transparent_18rem)]">
+    <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-transparent">
       <header className="sticky top-0 z-10 border-b border-border/70 bg-background/85 px-3 py-3 backdrop-blur-xl sm:px-5">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
